@@ -4,11 +4,11 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lucasew/go-annotation/annotation"
 	"github.com/spf13/cobra"
+    _ "modernc.org/sqlite"
+    "database/sql"
 )
 
 // annotatorCmd represents the annotator command
@@ -21,17 +21,25 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
         configFile, err := cmd.Flags().GetString("config")
-        if err != nil {
-            panic(err)
-        }
+        if err != nil { return err }
+
         config, err := annotation.LoadConfig(configFile)
-        if err != nil {
-            panic(err)
-        }
+        if err != nil { return err }
+
         spew.Dump(config)
-		fmt.Println("annotator called")
+        databaseFile, err := cmd.Flags().GetString("database")
+        if err != nil { return err }
+        db, err := sql.Open("sqlite", databaseFile)
+        if err != nil { return err }
+        defer db.Close()
+        spew.Dump(db)
+
+        imagesDir, err := cmd.Flags().GetString("images")
+        if err != nil { return err }
+        spew.Dump(databaseFile, imagesDir)
+        return nil
 	},
 }
 
@@ -43,6 +51,14 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	annotatorCmd.PersistentFlags().StringP("config", "c", "", "Config file for the annotation")
+    annotatorCmd.MarkPersistentFlagRequired("config")
+    annotatorCmd.MarkPersistentFlagFilename("config")
+	annotatorCmd.PersistentFlags().StringP("database", "d", "", "Where to store the annotation database")
+    annotatorCmd.MarkPersistentFlagRequired("database")
+    annotatorCmd.MarkPersistentFlagFilename("database")
+	annotatorCmd.PersistentFlags().StringP("images", "i", "", "Where to store the images")
+    annotatorCmd.MarkPersistentFlagDirname("images")
+    annotatorCmd.MarkPersistentFlagRequired("images")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
