@@ -18,14 +18,15 @@ classes:
     short_name: Tipo carro.
     type: class
     classes:
-      - name: Carro real
-        id: real_car
+      real_car:
+        name: Carro real
         description: Carro no dia a dia
-        example: null # todo: separar um
-      - name: Carro sintético
-        id: synthetic_car
+        examples:
+          - null # todo: separar um
+      synthetic_car:
+        name: Carro sintético
         description: Modelo ou imagem feita para impressionar
-      - name: Lixo
-        id: thrash
+      thrash:
+        name: Lixo
         description: Não tem carro, é um desenho ou thumbnail do YouTube. Pode ser outra coisa também.
 
