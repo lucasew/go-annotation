@@ -2,10 +2,15 @@ package annotation
 
 import (
 	_ "image/gif"
-	_ "image/png"
+	"image/png"
 	_ "image/jpeg"
     "image"
     "os"
+    "path"
+    "fmt"
+    "crypto/sha256"
+    "io"
+    "github.com/google/uuid"
 )
 
 func DecodeImage(filepath string) (image.Image, error) {
@@ -19,4 +24,20 @@ func DecodeImage(filepath string) (image.Image, error) {
         return nil, err
     }
     return m, err
+}
+
+func IngestImage(img image.Image, outputDir string) error {
+    tempFile := path.Join(outputDir, fmt.Sprintf("%s.png", uuid.New()))
+    f, err := os.Open(tempFile)
+    defer f.Close()
+    if err != nil {
+        return err
+    }
+    hasher := sha256.New()
+    w := io.MultiWriter(f, hasher)
+    err = png.Encode(w, img)
+    if err != nil {
+        return err
+    }
+    return os.Rename(tempFile, path.Join(outputDir, fmt.Sprintf("%x.png", hasher.Sum(nil))))
 }
