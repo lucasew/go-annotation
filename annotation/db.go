@@ -64,7 +64,7 @@ insert into images (sha256, filename) values (?, ?) on conflict(sha256) do updat
     if err != nil { return fmt.Errorf("while creating index for image hashes: %w", err) }
 
     log.Printf("PrepareDatabase: creating tables for each task")
-    for taskName := range config.Tasks {
+    for _, task := range config.Tasks {
         _, err := tx.Exec(fmt.Sprintf(`
 create table if not exists task_%s (
     image text not null,
@@ -72,9 +72,9 @@ create table if not exists task_%s (
     value text,
     sure int, -- 0 = not sure, 1 = sure
     foreign key(image) references images(sha256)
-)`, taskName))
+)`, task.ID))
         if err != nil {
-            return fmt.Errorf("while creating task database for task '%s': %w", taskName, err)
+            return fmt.Errorf("while creating task database for task '%s': %w", task.ID, err)
         }
     }
 

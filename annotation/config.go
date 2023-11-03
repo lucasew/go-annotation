@@ -12,7 +12,7 @@ type Config struct {
     Meta struct {
         Description string `yaml:"description"`
     } `yaml:"meta"`
-    Tasks map[string]*ConfigTask `yaml:"tasks"`
+    Tasks []*ConfigTask `yaml:"tasks"`
     Authentication map[string]*ConfigAuth `yaml:"auth"`
 }
 
@@ -21,6 +21,7 @@ type ConfigAuth struct {
 }
 
 type ConfigTask struct {
+    ID string `yaml:"id"`
     Name string `yaml:"name"`
     ShortName string `yaml:"short_name"`
     Type string `yaml:"type"`
@@ -49,14 +50,20 @@ func LoadConfig(filename string) (*Config, error) {
     if err != nil {
         return nil, err
     }
-    for taskName := range ret.Tasks {
-        if ret.Tasks[taskName].Type == "" {
-            ret.Tasks[taskName].Type = "class"
+    _taskDict := map[string]string{}
+    for _, task := range ret.Tasks {
+        taskName := task.ID
+        _, ok := _taskDict[taskName]
+        if ok {
+            return nil, fmt.Errorf("task with %s is defined twice", taskName)
         }
-        if ret.Tasks[taskName].Classes == nil {
-            ret.Tasks[taskName].Classes = getClassesFromClassType(ret.Tasks[taskName].Type)
+        if task.Type == "" {
+            task.Type = "class"
         }
-        if ret.Tasks[taskName].Classes == nil {
+        if task.Classes == nil {
+            task.Classes = getClassesFromClassType(task.Type)
+        }
+        if task.Classes == nil {
             return nil, fmt.Errorf("task %s does not have any classes or a compatible type", taskName)
         }
     }

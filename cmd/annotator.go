@@ -42,8 +42,8 @@ to quickly create a Cobra application.`,
         err = annotation.PrepareDatabase(cmd.Context(), db, config, imagesDir)
         if err != nil { return err }
         spew.Dump(databaseFile, imagesDir)
-        for k := range config.Tasks {
-            log.Printf("task: %s", k)
+        for _, task := range config.Tasks {
+            log.Printf("task: %s -- %s", task.ID, task.Name)
         }
         return nil
 	},
