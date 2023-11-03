@@ -1,0 +1,31 @@
+meta:
+  description: Classificação de imagens de carro do Google Imagens
+classes:
+  - id: has_carro
+    name: Tem um carro na imagem?
+    short_name: Carro?
+    type: boolean
+  - id: rotation_base
+    if:
+    - has_carro: true
+    name: Rotação de imagens para enquadrar um carro de baixo pra cima
+    short_name: Rotação
+    type: rotation
+  - id: tipo_carro
+    if:
+    - has_carro: true
+    name: Tipo de imagem de carro.
+    short_name: Tipo carro.
+    type: class
+    classes:
+      - name: Carro real
+        id: real_car
+        description: Carro no dia a dia
+        example: null # todo: separar um
+      - name: Carro sintético
+        id: synthetic_car
+        description: Modelo ou imagem feita para impressionar
+      - name: Lixo
+        id: thrash
+        description: Não tem carro, é um desenho ou thumbnail do YouTube. Pode ser outra coisa também.
+
