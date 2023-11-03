@@ -7,8 +7,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lucasew/go-annotation/annotation"
 	"github.com/spf13/cobra"
-    _ "modernc.org/sqlite"
-    "database/sql"
 )
 
 // annotatorCmd represents the annotator command
@@ -31,12 +29,16 @@ to quickly create a Cobra application.`,
         spew.Dump(config)
         databaseFile, err := cmd.Flags().GetString("database")
         if err != nil { return err }
-        db, err := sql.Open("sqlite", databaseFile)
+        db, err := annotation.GetDatabase(databaseFile)
         if err != nil { return err }
         defer db.Close()
         spew.Dump(db)
 
         imagesDir, err := cmd.Flags().GetString("images")
+        if err != nil { return err }
+
+
+        err = annotation.PrepareDatabase(cmd.Context(), db, config, imagesDir)
         if err != nil { return err }
         spew.Dump(databaseFile, imagesDir)
         return nil
