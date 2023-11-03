@@ -57,6 +57,7 @@ func LoadConfig(filename string) (*Config, error) {
         if ok {
             return nil, fmt.Errorf("task with %s is defined twice", taskName)
         }
+        _taskDict[taskName] = ""
         if task.Type == "" {
             task.Type = "class"
         }

@@ -5,6 +5,10 @@ tasks:
   name: Tem um carro na imagem?
   short_name: Carro?
   type: boolean
+- id: has_carro
+  name: Tem um carro na imagem?
+  short_name: Carro?
+  type: boolean
 - id: rotation_base
   if:
     has_carro: true
