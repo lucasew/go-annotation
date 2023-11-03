@@ -17,6 +17,6 @@ func HashFile(filepath string) (string, error) {
     if err != nil {
         return "", err
     }
-    hash := fmt.Sprint("%x", hasher.Sum(nil))
+    hash := fmt.Sprintf("%x", hasher.Sum(nil))
     return hash, nil
 }

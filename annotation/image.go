@@ -29,16 +29,23 @@ func DecodeImage(filepath string) (image.Image, error) {
 func IngestImage(img image.Image, outputDir string) error {
     tempFile := path.Join(outputDir, fmt.Sprintf("%s.png", uuid.New()))
     f, err := os.Create(tempFile)
-    defer f.Close()
     if err != nil {
         return err
     }
-    defer os.Remove(tempFile)
     hasher := sha256.New()
     w := io.MultiWriter(f, hasher)
     err = png.Encode(w, img)
     if err != nil {
         return err
     }
-    return os.Rename(tempFile, path.Join(outputDir, fmt.Sprintf("%x.png", hasher.Sum(nil))))
+    err = f.Close()
+    if err != nil {
+        return err
+    }
+    err = os.Rename(tempFile, path.Join(outputDir, fmt.Sprintf("%x.png", hasher.Sum(nil))))
+    if err != nil {
+        os.Remove(tempFile)
+        return err
+    }
+    return err
 }

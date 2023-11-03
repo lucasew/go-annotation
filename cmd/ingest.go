@@ -8,6 +8,7 @@ import (
 	"os"
     "log"
     "io/fs"
+    "sync"
 
 	"image"
 	"path/filepath"
@@ -44,7 +45,9 @@ var ingestCmd = &cobra.Command{
 
         crawledFilepaths := make(chan image.Image, 10) // pipeline
 
+        var wg sync.WaitGroup
         ingestWorker := func(queue chan image.Image) {
+            defer wg.Done()
             for image := range queue {
                 err := annotation.IngestImage(image, output)
                 if err != nil {
@@ -52,8 +55,11 @@ var ingestCmd = &cobra.Command{
                 }
             }
         }
-
-        go ingestWorker(crawledFilepaths)
+        defer wg.Wait()
+        for i := uint(0); i < jobs; i++ {
+            wg.Add(1)
+            go ingestWorker(crawledFilepaths)
+        }
 
         for _, input := range inputs {
             filepath.WalkDir(input, func(path string, info fs.DirEntry, err error) error {
@@ -72,11 +78,17 @@ var ingestCmd = &cobra.Command{
                 return nil
             })
         }
+        close(crawledFilepaths)
 	},
 }
 
+var (
+    jobs uint
+)
+
 func init() {
 	rootCmd.AddCommand(ingestCmd)
+    ingestCmd.PersistentFlags().UintVarP(&jobs, "jobs", "j", 1, "Amount of concurrent ingestors")
 
 	// Here you will define your flags and configuration settings.
 
