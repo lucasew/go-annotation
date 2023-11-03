@@ -24,8 +24,8 @@ func PrepareDatabase(ctx context.Context, db *sql.DB, config *Config, imageFolde
     log.Printf("PrepareDatabase: setting up images table")
     _, err = tx.Exec(`
 create table if not exists images (
-sha256 text unique primary key,
-filename text not null
+    sha256 text unique primary key,
+    filename text not null
 )
     `)
     if err != nil {
@@ -57,7 +57,28 @@ insert into images (sha256, filename) values (?, ?) on conflict(sha256) do updat
         return err
     })
     if err != nil { return err }
+    log.Printf("PrepareDatabase: create index for hashes to image paths") // TODO: check later if it's actually premature optimization
+    _, err = tx.Exec(`
+        create unique index if not exists images_hash_idx on images(sha256)
+    `)
+    if err != nil { return fmt.Errorf("while creating index for image hashes: %w", err) }
+
+    log.Printf("PrepareDatabase: creating tables for each task")
+    for taskName := range config.Tasks {
+        _, err := tx.Exec(fmt.Sprintf(`
+create table if not exists task_%s (
+    image text not null,
+    user text not null,
+    value text,
+    sure int, -- 0 = not sure, 1 = sure
+    foreign key(image) references images(sha256)
+)`, taskName))
+        if err != nil {
+            return fmt.Errorf("while creating task database for task '%s': %w", taskName, err)
+        }
+    }
 
     log.Printf("PrepareDatabase: success! commiting transaction to the database")
     return tx.Commit()
 }
+
