@@ -1,19 +1,19 @@
 meta:
   description: Classificação de imagens de carro do Google Imagens
-classes:
-  - id: has_carro
+tasks:
+  has_carro:
     name: Tem um carro na imagem?
     short_name: Carro?
     type: boolean
-  - id: rotation_base
+  rotation_base:
     if:
-    - has_carro: true
+      has_carro: true
     name: Rotação de imagens para enquadrar um carro de baixo pra cima
     short_name: Rotação
     type: rotation
-  - id: tipo_carro
+  tipo_carro:
     if:
-    - has_carro: true
+      has_carro: true
     name: Tipo de imagem de carro.
     short_name: Tipo carro.
     type: class
@@ -29,4 +29,8 @@ classes:
       thrash:
         name: Lixo
         description: Não tem carro, é um desenho ou thumbnail do YouTube. Pode ser outra coisa também.
+auth:
+  lucasew:
+    password: 123
+
 
