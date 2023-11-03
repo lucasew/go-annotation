@@ -6,6 +6,7 @@ package cmd
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lucasew/go-annotation/annotation"
+    "log"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +42,9 @@ to quickly create a Cobra application.`,
         err = annotation.PrepareDatabase(cmd.Context(), db, config, imagesDir)
         if err != nil { return err }
         spew.Dump(databaseFile, imagesDir)
+        for k := range config.Tasks {
+            log.Printf("task: %s", k)
+        }
         return nil
 	},
 }
