@@ -12,17 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func getHandler() http.Handler {
-    mux := http.NewServeMux()
-    mux.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
-        annotation.Template.Execute(w, nil)
-    })
-
-    var handler http.Handler = mux
-    handler = annotation.HTTPLogger(handler)
-    return handler
-}
-
 // annotatorCmd represents the annotator command
 var annotatorCmd = &cobra.Command{
 	Use:   "annotator",
@@ -34,34 +23,53 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-        addr, err := cmd.Flags().GetString("addr")
-        if err != nil { return err }
-        configFile, err := cmd.Flags().GetString("config")
-        if err != nil { return err }
+		addr, err := cmd.Flags().GetString("addr")
+		if err != nil {
+			return err
+		}
+		configFile, err := cmd.Flags().GetString("config")
+		if err != nil {
+			return err
+		}
 
-        config, err := annotation.LoadConfig(configFile)
-        if err != nil { return err }
+		config, err := annotation.LoadConfig(configFile)
+		if err != nil {
+			return err
+		}
 
-        spew.Dump(config)
-        databaseFile, err := cmd.Flags().GetString("database")
-        if err != nil { return err }
-        db, err := annotation.GetDatabase(databaseFile)
-        if err != nil { return err }
-        defer db.Close()
-        spew.Dump(db)
+		spew.Dump(config)
+		databaseFile, err := cmd.Flags().GetString("database")
+		if err != nil {
+			return err
+		}
+		db, err := annotation.GetDatabase(databaseFile)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		spew.Dump(db)
 
-        imagesDir, err := cmd.Flags().GetString("images")
-        if err != nil { return err }
+		imagesDir, err := cmd.Flags().GetString("images")
+		if err != nil {
+			return err
+		}
 
+		app := &annotation.AnnotatorApp{
+			ImagesDir: imagesDir,
+			Database:  db,
+			Config:    config,
+		}
+		err = app.PrepareDatabase(cmd.Context())
+		if err != nil {
+			return err
+		}
 
-        err = annotation.PrepareDatabase(cmd.Context(), db, config, imagesDir)
-        if err != nil { return err }
-        spew.Dump(databaseFile, imagesDir)
-        for _, task := range config.Tasks {
-            log.Printf("task: %s -- %s", task.ID, task.Name)
-        }
-        log.Printf("Listening on: %s", addr)
-        return http.ListenAndServe(addr, getHandler())
+		spew.Dump(databaseFile, imagesDir)
+		for _, task := range config.Tasks {
+			log.Printf("task: %s -- %s", task.ID, task.Name)
+		}
+		log.Printf("Listening on: %s", addr)
+		return http.ListenAndServe(addr, app.GetHTTPHandler())
 	},
 }
 
@@ -73,16 +81,16 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	annotatorCmd.PersistentFlags().StringP("config", "c", "", "Config file for the annotation")
-    annotatorCmd.MarkPersistentFlagRequired("config")
-    annotatorCmd.MarkPersistentFlagFilename("config")
+	annotatorCmd.MarkPersistentFlagRequired("config")
+	annotatorCmd.MarkPersistentFlagFilename("config")
 	annotatorCmd.PersistentFlags().StringP("database", "d", "", "Where to store the annotation database")
-    annotatorCmd.MarkPersistentFlagRequired("database")
-    annotatorCmd.MarkPersistentFlagFilename("database")
+	annotatorCmd.MarkPersistentFlagRequired("database")
+	annotatorCmd.MarkPersistentFlagFilename("database")
 	annotatorCmd.PersistentFlags().StringP("images", "i", "", "Where to store the images")
-    annotatorCmd.MarkPersistentFlagDirname("images")
-    annotatorCmd.MarkPersistentFlagRequired("images")
+	annotatorCmd.MarkPersistentFlagDirname("images")
+	annotatorCmd.MarkPersistentFlagRequired("images")
 
-    annotatorCmd.PersistentFlags().StringP("addr", "a", ":8080", "Where bind the webserver")
+	annotatorCmd.PersistentFlags().StringP("addr", "a", ":8080", "Where bind the webserver")
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// annotatorCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
