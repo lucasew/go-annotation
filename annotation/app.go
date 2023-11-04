@@ -41,9 +41,24 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			return
 		}
 		image_id := itemPath[2]
-		log.Printf("http: fetching asset %s", image_id)
+		log.Printf("http: fetching asset id %s", image_id)
+
+		rows, err := a.Database.QueryContext(r.Context(), "select filename from images where sha256 = ? limit 1", image_id)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("error: while querying for the filename of hash %s: %s", image_id, err)
+			return
+		}
+		if !rows.Next() {
+			log.Printf("http: asset id %s was not found in the database", image_id)
+			http.NotFoundHandler().ServeHTTP(w, r)
+			return
+		}
+		var filename string
+		rows.Scan(&filename)
+		log.Printf("http: asset id %s is %s!", image_id, filename)
 		// TODO: fetch image filename from database
-		f, err := os.Open(path.Join(a.ImagesDir, image_id))
+		f, err := os.Open(path.Join(a.ImagesDir, filename))
 		defer f.Close()
 		if errors.Is(err, os.ErrNotExist) {
 			http.NotFoundHandler().ServeHTTP(w, r)
@@ -102,7 +117,7 @@ create table if not exists images (
 			return fmt.Errorf("while hashing item '%s': %w", path, err)
 		}
 		_, err = tx.Exec(`
-insert into images (sha256, filename) values (?, ?) on conflict(sha256) do update set filename=excluded.filename
+insert into images (filename, sha256) values (?, ?) on conflict(sha256) do update set filename=excluded.filename
         `, info.Name(), fileHash)
 		return err
 	})
