@@ -4,11 +4,24 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"log"
+	"net/http"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lucasew/go-annotation/annotation"
-    "log"
 	"github.com/spf13/cobra"
 )
+
+func getHandler() http.Handler {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
+        annotation.Template.Execute(w, nil)
+    })
+
+    var handler http.Handler = mux
+    handler = annotation.HTTPLogger(handler)
+    return handler
+}
 
 // annotatorCmd represents the annotator command
 var annotatorCmd = &cobra.Command{
@@ -21,6 +34,8 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+        addr, err := cmd.Flags().GetString("addr")
+        if err != nil { return err }
         configFile, err := cmd.Flags().GetString("config")
         if err != nil { return err }
 
@@ -45,7 +60,8 @@ to quickly create a Cobra application.`,
         for _, task := range config.Tasks {
             log.Printf("task: %s -- %s", task.ID, task.Name)
         }
-        return nil
+        log.Printf("Listening on: %s", addr)
+        return http.ListenAndServe(addr, getHandler())
 	},
 }
 
@@ -66,6 +82,7 @@ func init() {
     annotatorCmd.MarkPersistentFlagDirname("images")
     annotatorCmd.MarkPersistentFlagRequired("images")
 
+    annotatorCmd.PersistentFlags().StringP("addr", "a", ":8080", "Where bind the webserver")
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// annotatorCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
