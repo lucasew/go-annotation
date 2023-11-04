@@ -3,10 +3,14 @@ package annotation
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -31,13 +35,26 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	})
 
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
-		path := strings.Split(r.URL.Path, "/")
-		if len(path) != 3 {
+		itemPath := strings.Split(r.URL.Path, "/")
+		if len(itemPath) != 3 {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
-
-		log.Printf("http: fetching asset %s", path[2])
+		image_id := itemPath[2]
+		log.Printf("http: fetching asset %s", image_id)
+		// TODO: fetch image filename from database
+		f, err := os.Open(path.Join(a.ImagesDir, image_id))
+		defer f.Close()
+		if errors.Is(err, os.ErrNotExist) {
+			http.NotFoundHandler().ServeHTTP(w, r)
+			return
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf("error: http: while serving image asset: %s", err)
+			return
+		}
+		io.Copy(w, f)
 	})
 	log.Printf("images dir: %s", a.ImagesDir)
 
