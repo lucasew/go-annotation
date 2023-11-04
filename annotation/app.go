@@ -30,12 +30,41 @@ func (a *AnnotatorApp) init() {
 func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	a.init()
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/help/", func(w http.ResponseWriter, r *http.Request) {
+		itemPath := strings.Split(r.URL.Path, "/")
+		if len(itemPath) != 3 {
+			http.NotFoundHandler().ServeHTTP(w, r)
+			return
+		}
+		helpTask := itemPath[len(itemPath)-1]
 		var markdownBuilder strings.Builder
-		fmt.Fprintf(&markdownBuilder, "# Welcome\n")
-		fmt.Fprintf(&markdownBuilder, "Welcome to go-annotator\n")
-
-		ExecTemplate(w, TemplateContent{Title: "Welcome", Content: markdownBuilder.String()})
+		title := "Help"
+		fmt.Fprintf(&markdownBuilder, "# Project help\n")
+		fmt.Fprintf(&markdownBuilder, "## Description\n")
+		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(a.Config.Meta.Description, "\n", "\n>"))
+		if helpTask == "" {
+			if len(itemPath) == 3 {
+				fmt.Fprintf(&markdownBuilder, "## Phases\n\n")
+				for _, task := range a.Config.Tasks {
+					fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
+					fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(task.Name, "\n", "\n>"))
+				}
+			}
+		} else {
+			var task *ConfigTask = nil
+			for _, currentTask := range a.Config.Tasks {
+				if currentTask.ID == helpTask {
+					task = currentTask
+				}
+			}
+			if task == nil {
+				http.NotFoundHandler().ServeHTTP(w, r)
+				return
+			}
+			fmt.Fprintf(&markdownBuilder, "## Phase: %s\n", task.ShortName)
+			fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(task.Name, "\n", "\n>"))
+		}
+		ExecTemplate(w, TemplateContent{Title: title, Content: markdownBuilder.String()})
 	})
 
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +104,15 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		}
 		io.Copy(w, f)
 	})
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var markdownBuilder strings.Builder
+		fmt.Fprintf(&markdownBuilder, "# Welcome\n")
+		fmt.Fprintf(&markdownBuilder, "Welcome to go-annotator\n")
+
+		ExecTemplate(w, TemplateContent{Title: "Welcome", Content: markdownBuilder.String()})
+	})
+
 	log.Printf("images dir: %s", a.ImagesDir)
 
 	var handler http.Handler = mux

@@ -1,5 +1,8 @@
 meta:
-  description: Classificação de imagens de carro do Google Imagens
+  description: |-
+    Classificação de imagens de carro do Google Imagens
+
+    Dataset de exemplo
 tasks:
 - id: has_carro
   name: Tem um carro na imagem?
