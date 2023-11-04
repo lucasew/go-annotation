@@ -31,7 +31,11 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	a.init()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		Template.Execute(w, nil)
+		var markdownBuilder strings.Builder
+		fmt.Fprintf(&markdownBuilder, "# Welcome\n")
+		fmt.Fprintf(&markdownBuilder, "Welcome to go-annotator\n")
+
+		ExecTemplate(w, TemplateContent{Title: "Welcome", Content: markdownBuilder.String()})
 	})
 
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
