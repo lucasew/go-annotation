@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -206,7 +207,29 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			return
 		}
 
-		fmt.Fprintf(&markdownBuilder, "[<](/)")
+		fmt.Fprintf(&markdownBuilder, `<form style="display: flex; justify-content: space-between" action="/annotate/%s/%s" method="post">`, taskID, imageID)
+		fmt.Fprintf(&markdownBuilder, `<a href="/"><</a>`)
+		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between;">`)
+		classNames := make([]string, 0, len(task.Classes))
+		for class := range task.Classes {
+			classNames = append(classNames, class)
+		}
+		sort.Sort(sort.StringSlice(classNames))
+		for _, class := range classNames {
+			classMeta := task.Classes[class]
+			fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center" onclick="document.getElementById('%s_radio').checked='checked'">`, class)
+			fmt.Fprintf(&markdownBuilder, `<input type="radio" id="%s_radio" name="selectedClass" value="%s">`, class, class)
+			fmt.Fprintf(&markdownBuilder, `<label for="%s_radio">%s</label>`, class, classMeta.Name)
+			fmt.Fprintf(&markdownBuilder, `</div>`)
+		}
+		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center" onclick="document.getElementById('sure_check').checked = !document.getElementById('sure_check').checked">`)
+		fmt.Fprintf(&markdownBuilder, `<input type="checkbox" id="sure_check" name="sure"><label for="sure_check">Sure?</label>`)
+		fmt.Fprintf(&markdownBuilder, `</div>`)
+		fmt.Fprintf(&markdownBuilder, "</div>")
+		fmt.Fprintf(&markdownBuilder, `<button type="submit">Send</button>`)
+		fmt.Fprintf(&markdownBuilder, "</form>")
+
+		fmt.Fprintf(&markdownBuilder, `<p id="image_id" onclick="navigator.clipboard.writeText(this.innerText); alert('Copied to clipboard!')" style="overflow-x: hidden; text-align: center;">%s</p>`, imageID)
 
 		fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", imageID)
 
