@@ -217,13 +217,22 @@ insert into images (filename, sha256) values (?, ?) on conflict(sha256) do updat
 		_, err := tx.Exec(fmt.Sprintf(`
 create table if not exists task_%s (
     image text not null,
-    user text not null,
+    user text,
     value text,
     sure int, -- 0 = not sure, 1 = sure
     foreign key(image) references images(sha256)
-)`, task.ID))
+);
+
+`, task.ID))
 		if err != nil {
 			return fmt.Errorf("while creating task database for task '%s': %w", task.ID, err)
+		}
+		_, err = tx.Exec(fmt.Sprintf(`
+insert into task_%s (image) select sha256 image from images
+`, task.ID))
+
+		if err != nil {
+			return fmt.Errorf("while seeding task database for task '%s': %w", task.ID, err)
 		}
 	}
 
