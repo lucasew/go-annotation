@@ -46,6 +46,39 @@ func pathParts(path string) []string {
 	return parts
 }
 
+type AnnotationResponse struct {
+	ImageID string
+	TaskID  string
+	ClassID string
+	User    string
+	Value   string
+	Sure    bool
+}
+
+func (a *AnnotatorApp) SubmitAnnotation(ctx context.Context, annotation AnnotationResponse) error {
+	tx, err := a.Database.BeginTx(ctx, &sql.TxOptions{})
+	defer tx.Rollback()
+	if err != nil {
+		return fmt.Errorf("while starting transaction: %w", err)
+	}
+	task := a.GetTask(annotation.TaskID)
+	if task != nil {
+		return fmt.Errorf("no such task") // did you check for the task before calling this?
+	}
+	_, err = tx.Exec(
+		fmt.Sprintf("update task_%s set user = ?, value = ?, sure = ? where image == ?", task.ID),
+		annotation.User, annotation.Value, annotation.Sure, annotation.ImageID,
+	)
+	if err != nil {
+		return fmt.Errorf("while updating value of the annotation: %w", err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("while commiting transaction: %w", err)
+	}
+	return nil
+}
+
 func (a *AnnotatorApp) GetTask(taskID string) *ConfigTask {
 	for _, currentTask := range a.Config.Tasks {
 		if currentTask.ID == taskID {
