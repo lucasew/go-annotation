@@ -27,6 +27,14 @@ func (a *AnnotatorApp) init() {
 	}
 }
 
+func stringOr(str, or string) string {
+	if str != "" {
+		return str
+	} else {
+		return or
+	}
+}
+
 func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	a.init()
 	mux := http.NewServeMux()
@@ -39,15 +47,15 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		helpTask := itemPath[len(itemPath)-1]
 		var markdownBuilder strings.Builder
 		title := "Help"
-		fmt.Fprintf(&markdownBuilder, "# Project help\n")
+		fmt.Fprintf(&markdownBuilder, "# [<](/) Project help\n")
 		fmt.Fprintf(&markdownBuilder, "## Description\n")
-		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(a.Config.Meta.Description, "\n", "\n>"))
+		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, "(No description provided)"), "\n", "\n>"))
 		if helpTask == "" {
 			if len(itemPath) == 3 {
 				fmt.Fprintf(&markdownBuilder, "## Phases\n\n")
 				for _, task := range a.Config.Tasks {
 					fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
-					fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(task.Name, "\n", "\n>"))
+					fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, "(No description provided)"), "\n", "\n>"))
 				}
 			}
 		} else {
@@ -62,11 +70,38 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 				return
 			}
 			fmt.Fprintf(&markdownBuilder, "## Phase: %s\n", task.ShortName)
-			fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(task.Name, "\n", "\n>"))
+			fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, "(No description provided)"), "\n", "\n>"))
+
+			fmt.Fprintf(&markdownBuilder, "### Possible choices\n")
+			for k, v := range task.Classes {
+				fmt.Fprintf(&markdownBuilder, "#### %s (%s)\n", stringOr(v.Name, "(No name)"), k)
+
+				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(v.Description, "(No description provided)"), "\n", "\n>"))
+				if v.Examples != nil && len(v.Examples) > 0 {
+
+					fmt.Fprintf(&markdownBuilder, "##### Examples\n")
+					for _, example := range v.Examples {
+						fmt.Fprintf(&markdownBuilder, "![](/asset/%s)", example)
+					}
+				}
+			}
 		}
 		ExecTemplate(w, TemplateContent{Title: title, Content: markdownBuilder.String()})
 	})
 
+	mux.HandleFunc("/annotate/", func(w http.ResponseWriter, r *http.Request) {
+		itemPath := strings.Split(r.URL.Path, "/")
+		if len(itemPath) > 0 && itemPath[0] == "" {
+			itemPath = itemPath[1:]
+		}
+
+		var markdownBuilder strings.Builder
+		fmt.Fprintf(&markdownBuilder, "[<](/)")
+		for _, part := range itemPath {
+			fmt.Fprintf(&markdownBuilder, "\n\n- **%s**\n", part)
+		}
+		ExecTemplate(w, TemplateContent{Title: "annotation", Content: markdownBuilder.String()})
+	})
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
 		itemPath := strings.Split(r.URL.Path, "/")
 		if len(itemPath) != 3 {
@@ -107,8 +142,11 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var markdownBuilder strings.Builder
-		fmt.Fprintf(&markdownBuilder, "# Welcome\n")
-		fmt.Fprintf(&markdownBuilder, "Welcome to go-annotator\n")
+		fmt.Fprintf(&markdownBuilder, "# Welcome to go-annotator\n")
+		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(a.Config.Meta.Description, "\n", "\n>"))
+		fmt.Fprintf(&markdownBuilder, "\n\n")
+		fmt.Fprintf(&markdownBuilder, "[Annotation instructions](/help) ")
+		fmt.Fprintf(&markdownBuilder, "[Continue annotations](/annotate)")
 
 		ExecTemplate(w, TemplateContent{Title: "Welcome", Content: markdownBuilder.String()})
 	})
