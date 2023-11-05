@@ -35,36 +35,45 @@ func stringOr(str, or string) string {
 	}
 }
 
+func pathParts(path string) []string {
+	parts := strings.Split(path, "/")
+	if len(parts) > 0 && parts[0] == "" {
+		parts = parts[1:]
+	}
+	if len(parts) > 0 && parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+	return parts
+}
+
+func (a *AnnotatorApp) GetTask(taskID string) *ConfigTask {
+	for _, currentTask := range a.Config.Tasks {
+		if currentTask.ID == taskID {
+			return currentTask
+		}
+	}
+	return nil
+}
+
 func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	a.init()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/help/", func(w http.ResponseWriter, r *http.Request) {
-		itemPath := strings.Split(r.URL.Path, "/")
-		if len(itemPath) != 3 {
-			http.NotFoundHandler().ServeHTTP(w, r)
-			return
-		}
-		helpTask := itemPath[len(itemPath)-1]
+		itemPath := pathParts(r.URL.Path)
 		var markdownBuilder strings.Builder
 		title := "Help"
 		fmt.Fprintf(&markdownBuilder, "# [<](/) Project help\n")
 		fmt.Fprintf(&markdownBuilder, "## Description\n")
 		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, "(No description provided)"), "\n", "\n>"))
-		if helpTask == "" {
-			if len(itemPath) == 3 {
-				fmt.Fprintf(&markdownBuilder, "## Phases\n\n")
-				for _, task := range a.Config.Tasks {
-					fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
-					fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, "(No description provided)"), "\n", "\n>"))
-				}
+		if len(itemPath) == 1 {
+			fmt.Fprintf(&markdownBuilder, "## Phases\n\n")
+			for _, task := range a.Config.Tasks {
+				fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
+				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, "(No description provided)"), "\n", "\n>"))
 			}
-		} else {
-			var task *ConfigTask = nil
-			for _, currentTask := range a.Config.Tasks {
-				if currentTask.ID == helpTask {
-					task = currentTask
-				}
-			}
+		} else if len(itemPath) == 2 {
+			helpTask := itemPath[1]
+			task := a.GetTask(helpTask)
 			if task == nil {
 				http.NotFoundHandler().ServeHTTP(w, r)
 				return
@@ -85,17 +94,24 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 					}
 				}
 			}
+		} else {
+			http.NotFoundHandler().ServeHTTP(w, r)
+			return
 		}
 		ExecTemplate(w, TemplateContent{Title: title, Content: markdownBuilder.String()})
 	})
 
 	mux.HandleFunc("/annotate/", func(w http.ResponseWriter, r *http.Request) {
-		itemPath := strings.Split(r.URL.Path, "/")
-		if len(itemPath) > 0 && itemPath[0] == "" {
-			itemPath = itemPath[1:]
+		var markdownBuilder strings.Builder
+		itemPath := pathParts(r.URL.Path)
+
+		if len(itemPath) == 2 {
+			fmt.Fprintf(&markdownBuilder, "**Two items**")
+		}
+		if len(itemPath) == 3 {
+			fmt.Fprintf(&markdownBuilder, "**Three items**")
 		}
 
-		var markdownBuilder strings.Builder
 		fmt.Fprintf(&markdownBuilder, "[<](/)")
 		for _, part := range itemPath {
 			fmt.Fprintf(&markdownBuilder, "\n\n- **%s**\n", part)
@@ -103,12 +119,12 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		ExecTemplate(w, TemplateContent{Title: "annotation", Content: markdownBuilder.String()})
 	})
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
-		itemPath := strings.Split(r.URL.Path, "/")
-		if len(itemPath) != 3 {
+		itemPath := pathParts(r.URL.Path)
+		if len(itemPath) != 2 {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
-		image_id := itemPath[2]
+		image_id := itemPath[1]
 		log.Printf("http: fetching asset id %s", image_id)
 
 		rows, err := a.Database.QueryContext(r.Context(), "select filename from images where sha256 = ? limit 1", image_id)
