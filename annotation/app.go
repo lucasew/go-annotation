@@ -61,13 +61,14 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 			if step == nil {
 				continue
 			}
+			return step, nil
 		}
 		return nil, nil
 	}
 	// TODO: deal with the case of an empty taskID
 	task := a.GetTask(taskID)
 	ret := AnnotationStep{TaskID: taskID}
-	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value = NULL limit 1", task.ID))
+	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value is NULL limit 1", task.ID))
 	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("while fetching pending tasks: %w", err)
@@ -79,7 +80,7 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		}
 		return &ret, nil
 	}
-	rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure = 0 limit 1", task.ID))
+	rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 limit 1", task.ID))
 	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
@@ -171,7 +172,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 					fmt.Fprintf(&markdownBuilder, "##### Examples\n")
 					for _, example := range v.Examples {
-						fmt.Fprintf(&markdownBuilder, "![](/asset/%s)", example)
+						fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", example)
 					}
 				}
 			}
@@ -186,17 +187,29 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		var markdownBuilder strings.Builder
 		itemPath := pathParts(r.URL.Path)
 
-		if len(itemPath) == 2 {
-			fmt.Fprintf(&markdownBuilder, "**Two items**")
+		if len(itemPath) != 3 {
+			step, err := a.NextAnnotationStep(r.Context(), "")
+			if err != nil || step == nil {
+				log.Printf("error in annotate when getting next step from scratch: %s", err)
+				w.WriteHeader(500)
+				return
+			}
+			http.Redirect(w, r, fmt.Sprintf("/annotate/%s/%s", step.TaskID, step.ImageID), http.StatusSeeOther)
+			return
 		}
-		if len(itemPath) == 3 {
-			fmt.Fprintf(&markdownBuilder, "**Three items**")
+
+		taskID := itemPath[1]
+		imageID := itemPath[2]
+		task := a.GetTask(taskID)
+		if task == nil {
+			http.NotFoundHandler().ServeHTTP(w, r)
+			return
 		}
 
 		fmt.Fprintf(&markdownBuilder, "[<](/)")
-		for _, part := range itemPath {
-			fmt.Fprintf(&markdownBuilder, "\n\n- **%s**\n", part)
-		}
+
+		fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", imageID)
+
 		ExecTemplate(w, TemplateContent{Title: "annotation", Content: markdownBuilder.String()})
 	})
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
