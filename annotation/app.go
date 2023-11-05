@@ -46,6 +46,54 @@ func pathParts(path string) []string {
 	return parts
 }
 
+type AnnotationStep struct {
+	TaskID  string
+	ImageID string
+}
+
+func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*AnnotationStep, error) {
+	if taskID == "" {
+		for _, task := range a.Config.Tasks {
+			step, err := a.NextAnnotationStep(ctx, task.ID)
+			if err != nil {
+				return nil, err
+			}
+			if step == nil {
+				continue
+			}
+		}
+		return nil, nil
+	}
+	// TODO: deal with the case of an empty taskID
+	task := a.GetTask(taskID)
+	ret := AnnotationStep{TaskID: taskID}
+	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value = NULL limit 1", task.ID))
+	defer rows.Close()
+	if err != nil {
+		return nil, fmt.Errorf("while fetching pending tasks: %w", err)
+	}
+	if rows.Next() {
+		err = rows.Scan(&ret.ImageID)
+		if err != nil {
+			return nil, err
+		}
+		return &ret, nil
+	}
+	rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure = 0 limit 1", task.ID))
+	defer rows.Close()
+	if err != nil {
+		return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
+	}
+	if rows.Next() {
+		err = rows.Scan(&ret.ImageID)
+		if err != nil {
+			return nil, err
+		}
+		return &ret, nil
+	}
+	return nil, nil
+}
+
 type AnnotationResponse struct {
 	ImageID string
 	TaskID  string
