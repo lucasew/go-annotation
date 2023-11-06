@@ -389,11 +389,17 @@ func (a *AnnotatorApp) authenticationMiddleware(handler http.Handler) http.Handl
 			item, ok = a.Config.Authentication[username]
 			if ok {
 				if password == item.Password {
+					log.Printf("auth for user %s: success", username)
 					handler.ServeHTTP(w, r)
 					return
 				}
+				log.Printf("auth for user %s: bad password", username)
+			} else {
+
+				log.Printf("auth for user %s: no such user", username)
 			}
 		}
+		log.Printf("auth: not ok")
 		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
 		w.WriteHeader(http.StatusUnauthorized)
 	})
