@@ -35,5 +35,13 @@ tasks:
 auth:
   lucasew:
     password: 123
-
-
+  fulano:
+    password: 123
+  ciclano:
+    password: 123
+  beltrano:
+    password: 123
+  cnpjoto:
+    password: 123
+  calabreso:
+    password: 123
