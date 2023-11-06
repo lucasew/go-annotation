@@ -254,7 +254,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		sort.Sort(sort.StringSlice(classNames))
 
 		fmt.Fprintf(&markdownBuilder, "# [<](/) %s\n", task.Name)
-		fmt.Fprintf(&markdownBuilder, `<form hx-swap="none" action="/annotate/%s/%s" hx-confirm="Are you sure?" hx-post style="display: flex; justify-content: space-between">`, taskID, imageID)
+		fmt.Fprintf(&markdownBuilder, `<form hx-swap="none" action="/annotate/%s/%s" hx-post style="display: flex; justify-content: space-between">`, taskID, imageID)
 		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between;">`)
 		for _, class := range classNames {
 			classMeta := task.Classes[class]
@@ -333,7 +333,26 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 	var handler http.Handler = mux
 	handler = HTTPLogger(handler)
+	handler = a.authenticationMiddleware(handler)
 	return handler
+}
+
+func (a *AnnotatorApp) authenticationMiddleware(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if ok {
+			var item *ConfigAuth = nil
+			item, ok = a.Config.Authentication[username]
+			if ok {
+				if password == item.Password {
+					handler.ServeHTTP(w, r)
+					return
+				}
+			}
+		}
+		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	})
 }
 
 func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
