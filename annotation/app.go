@@ -54,8 +54,9 @@ func pathParts(path string) []string {
 }
 
 type AnnotationStep struct {
-	TaskID  string
-	ImageID string
+	TaskID    string
+	ImageID   string
+	ImageName string
 }
 
 func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*AnnotationStep, error) {
@@ -72,10 +73,14 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		}
 		return nil, nil
 	}
-	// TODO: deal with the case of an empty taskID
 	task := a.GetTask(taskID)
+	filters := ""
+	for criteriaTask, criteriaValue := range task.If {
+		filters = fmt.Sprintf("and (image in (select image from task_%s where value = '%s' and sure = 1 ))", criteriaTask, criteriaValue)
+	}
+
 	ret := AnnotationStep{TaskID: taskID}
-	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value is NULL", task.ID))
+	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value is NULL %s", task.ID, filters))
 	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("while fetching pending tasks: %w", err)
@@ -93,7 +98,7 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		imageIDs = append(imageIDs, imageID)
 	}
 	if len(imageIDs) == 0 {
-		rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 limit 1", task.ID))
+		rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 %s", task.ID, filters))
 		defer rows.Close()
 		if err != nil {
 			return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
@@ -115,6 +120,19 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		return &ret, nil
 	}
 	return nil, nil
+}
+
+func (a *AnnotatorApp) GetFilenameFromHash(ctx context.Context, hash string) (filename string, err error) {
+	rows, err := a.Database.QueryContext(ctx, "select filename from images where sha256 = ?", hash)
+	defer rows.Close()
+	if err != nil {
+		return "", err
+	}
+	if !rows.Next() {
+		return "", fmt.Errorf("No filename found for hash")
+	}
+	err = rows.Scan(&filename)
+	return
 }
 
 type AnnotationResponse struct {
@@ -210,12 +228,20 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 		if len(itemPath) != 3 {
 			step, err := a.NextAnnotationStep(r.Context(), "")
-			if err != nil || step == nil {
+			if err != nil {
 				log.Printf("error in annotate when getting next step from scratch: %s", err)
 				w.WriteHeader(500)
 				return
 			}
+			if step == nil {
+				fmt.Fprintf(&markdownBuilder, "# Congratulations!\n")
+				fmt.Fprintf(&markdownBuilder, "All annotations are done!\n\n")
+				fmt.Fprintf(&markdownBuilder, "[Go to the main page](/)\n")
+				ExecTemplate(w, TemplateContent{Title: "All annotations done!", Content: markdownBuilder.String()})
+				return
+			}
 			http.Redirect(w, r, fmt.Sprintf("/annotate/%s/%s", step.TaskID, step.ImageID), http.StatusSeeOther)
+
 			return
 		}
 
@@ -227,6 +253,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
+		filename, _ := a.GetFilenameFromHash(r.Context(), imageID)
 
 		if r.Method == http.MethodPost {
 			log.Printf("POST")
@@ -279,10 +306,10 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		}
 		sort.Sort(sort.StringSlice(classNames))
 
-		fmt.Fprintf(&markdownBuilder, "# [<](/) %s\n", task.Name)
+		fmt.Fprintf(&markdownBuilder, "# [<](/) %s [???](/help/%s) \n", task.Name, task.ID)
 		thisURL := fmt.Sprintf("/annotate/%s/%s", taskID, imageID)
 
-		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between;">`)
+		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between">`)
 		for _, class := range classNames {
 			classMeta := task.Classes[class]
 			fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="%s" data_sure="on" hx-vals='js:{selectedClass: event.target.attributes.data_selectedClass.value, sure: event.target.attributes.data_sure.value}'>%s</button>`, thisURL, class, classMeta.Name)
@@ -291,7 +318,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 		fmt.Fprintf(&markdownBuilder, `</div>`)
 
-		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('Copied to clipboard!')" style="overflow-x: hidden; text-align: center;">%s</p>`, imageID)
+		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('Copied to clipboard!')" style="overflow-x: hidden; text-align: center;">%s</p>`, filename)
 
 		fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", imageID)
 
