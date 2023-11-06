@@ -209,6 +209,11 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 		if r.Method == http.MethodPost {
 			log.Printf("POST")
+			r.ParseForm()
+			if !(r.Form.Has("selectedClass") && r.Form.Has("sure")) {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
 			selectedClass := r.FormValue("selectedClass")
 			_, isClassValid := task.Classes[selectedClass]
 			log.Printf("Selected class: %s empty=%v valid=%v", selectedClass, selectedClass == "", isClassValid)
@@ -254,25 +259,16 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		sort.Sort(sort.StringSlice(classNames))
 
 		fmt.Fprintf(&markdownBuilder, "# [<](/) %s\n", task.Name)
-		fmt.Fprintf(&markdownBuilder, `<form hx-swap="none" action="/annotate/%s/%s" hx-post style="display: flex; justify-content: space-between">`, taskID, imageID)
+		thisURL := fmt.Sprintf("/annotate/%s/%s", taskID, imageID)
+
 		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between;">`)
 		for _, class := range classNames {
 			classMeta := task.Classes[class]
-			fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center" hx-on:click="document.getElementById('%s_radio').checked='checked'">`, class)
-			fmt.Fprintf(&markdownBuilder, `<input type="radio" id="%s_radio" name="selectedClass" value="%s">`, class, class)
-			fmt.Fprintf(&markdownBuilder, `<label for="%s_radio">%s</label>`, class, classMeta.Name)
-			fmt.Fprintf(&markdownBuilder, `</div>`)
+			fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="%s" data_sure="on" hx-vals='js:{selectedClass: event.target.attributes.data_selectedClass.value, sure: event.target.attributes.data_sure.value}'>%s</button>`, thisURL, class, classMeta.Name)
 		}
-		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center">`)
-		fmt.Fprintf(&markdownBuilder, `<input type="checkbox" id="sure_check" name="sure">`)
-		fmt.Fprintf(&markdownBuilder, `<label for="sure_check">%s</label>`, "Sure?")
+		fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="" data_sure="off" hx-vals='js:{selectedClass: event.attributes.data_selectedClass.value, sure: event.attributes.data_sure.value}'>???</button>`, thisURL)
+
 		fmt.Fprintf(&markdownBuilder, `</div>`)
-		// fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center" onclick="document.getElementById('sure_check').checked = !document.getElementById('sure_check').checked">`)
-		// fmt.Fprintf(&markdownBuilder, `<input type="checkbox" id="sure_check" name="sure"><label for="sure_check">Sure?</label>`)
-		// fmt.Fprintf(&markdownBuilder, `</div>`)
-		fmt.Fprintf(&markdownBuilder, "</div>")
-		fmt.Fprintf(&markdownBuilder, `<button type="submit">Send</button>`)
-		fmt.Fprintf(&markdownBuilder, "</form>")
 
 		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('Copied to clipboard!')" style="overflow-x: hidden; text-align: center;">%s</p>`, imageID)
 
