@@ -5,8 +5,8 @@ meta:
     Dataset de exemplo
 tasks:
 - id: has_carro
-  name: Tem um carro na imagem?
-  short_name: Carro?
+  name: Tem a vista externa de um carro real na imagem?
+  short_name: Carro real?
   type: boolean
 - id: rotation_base
   if:

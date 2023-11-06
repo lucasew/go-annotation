@@ -99,7 +99,6 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 type AnnotationResponse struct {
 	ImageID string
 	TaskID  string
-	ClassID string
 	User    string
 	Value   string
 	Sure    bool
@@ -112,7 +111,7 @@ func (a *AnnotatorApp) SubmitAnnotation(ctx context.Context, annotation Annotati
 		return fmt.Errorf("while starting transaction: %w", err)
 	}
 	task := a.GetTask(annotation.TaskID)
-	if task != nil {
+	if task == nil {
 		return fmt.Errorf("no such task") // did you check for the task before calling this?
 	}
 	_, err = tx.Exec(
@@ -201,20 +200,62 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 		taskID := itemPath[1]
 		imageID := itemPath[2]
+		log.Printf("taskID=%v imageID=%v", taskID, imageID)
 		task := a.GetTask(taskID)
 		if task == nil {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
 
-		fmt.Fprintf(&markdownBuilder, `<form hx-swap="none" action="/annotate/%s/%s" hx-confirm="Are you sure?" hx-post style="display: flex; justify-content: space-between">`, taskID, imageID)
-		fmt.Fprintf(&markdownBuilder, `<a href="/"><</a>`)
-		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between;">`)
+		if r.Method == http.MethodPost {
+			log.Printf("POST")
+			selectedClass := r.FormValue("selectedClass")
+			_, isClassValid := task.Classes[selectedClass]
+			log.Printf("Selected class: %s empty=%v valid=%v", selectedClass, selectedClass == "", isClassValid)
+			sure := r.FormValue("sure") == "on"
+			log.Printf("Sure: %v", sure)
+			user, _, _ := r.BasicAuth()
+			err := a.SubmitAnnotation(r.Context(), AnnotationResponse{
+				ImageID: imageID,
+				TaskID:  taskID,
+				User:    user,
+				Value:   selectedClass,
+				Sure:    sure,
+			})
+			if err != nil {
+				log.Printf("error while submitting annotation: %s", err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			step, err := a.NextAnnotationStep(r.Context(), taskID)
+			if err != nil {
+				log.Printf("error while getting next step: %s", err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			if step == nil {
+				step, err = a.NextAnnotationStep(r.Context(), "")
+				if err != nil {
+					log.Printf("error while getting next step at the end of task: %s", err)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			}
+			if step == nil {
+				w.Header().Add("HX-Redirect", "/")
+			} else if step.TaskID != taskID {
+				w.Header().Add("HX-Redirect", fmt.Sprintf("/help/%s", step.TaskID))
+			} else {
+				w.Header().Add("HX-Redirect", fmt.Sprintf("/annotate/%s/%s", taskID, step.ImageID))
+			}
+			return
+		}
 		classNames := make([]string, 0, len(task.Classes))
 		for class := range task.Classes {
 			classNames = append(classNames, class)
 		}
 		sort.Sort(sort.StringSlice(classNames))
+
+		fmt.Fprintf(&markdownBuilder, "# [<](/) %s\n", task.Name)
+		fmt.Fprintf(&markdownBuilder, `<form hx-swap="none" action="/annotate/%s/%s" hx-confirm="Are you sure?" hx-post style="display: flex; justify-content: space-between">`, taskID, imageID)
+		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between;">`)
 		for _, class := range classNames {
 			classMeta := task.Classes[class]
 			fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center" hx-on:click="document.getElementById('%s_radio').checked='checked'">`, class)
@@ -222,6 +263,10 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			fmt.Fprintf(&markdownBuilder, `<label for="%s_radio">%s</label>`, class, classMeta.Name)
 			fmt.Fprintf(&markdownBuilder, `</div>`)
 		}
+		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center">`)
+		fmt.Fprintf(&markdownBuilder, `<input type="checkbox" id="sure_check" name="sure">`)
+		fmt.Fprintf(&markdownBuilder, `<label for="sure_check">%s</label>`, "Sure?")
+		fmt.Fprintf(&markdownBuilder, `</div>`)
 		// fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex: 1; justify-content: center" onclick="document.getElementById('sure_check').checked = !document.getElementById('sure_check').checked">`)
 		// fmt.Fprintf(&markdownBuilder, `<input type="checkbox" id="sure_check" name="sure"><label for="sure_check">Sure?</label>`)
 		// fmt.Fprintf(&markdownBuilder, `</div>`)
@@ -349,7 +394,7 @@ insert into images (filename, sha256) values (?, ?) on conflict(sha256) do updat
 	for _, task := range a.Config.Tasks {
 		_, err := tx.Exec(fmt.Sprintf(`
 create table if not exists task_%s (
-    image text not null,
+    image text not null unique,
     user text,
     value text,
     sure int, -- 0 = not sure, 1 = sure
@@ -361,7 +406,7 @@ create table if not exists task_%s (
 			return fmt.Errorf("while creating task database for task '%s': %w", task.ID, err)
 		}
 		_, err = tx.Exec(fmt.Sprintf(`
-insert into task_%s (image) select sha256 image from images
+insert or ignore into task_%s (image) select sha256 image from images
 `, task.ID))
 
 		if err != nil {
