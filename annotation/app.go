@@ -14,17 +14,23 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"math/rand"
 )
 
 type AnnotatorApp struct {
-	ImagesDir string
-	Database  *sql.DB
-	Config    *Config
+	ImagesDir     string
+	Database      *sql.DB
+	Config        *Config
+	OffsetAdvance int
 }
 
 func (a *AnnotatorApp) init() {
 	if a.ImagesDir[len(a.ImagesDir)-1] == '/' {
 		a.ImagesDir = a.ImagesDir[:len(a.ImagesDir)-1]
+	}
+	if a.OffsetAdvance == 0 {
+		a.OffsetAdvance = 10
 	}
 }
 
@@ -69,16 +75,25 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 	// TODO: deal with the case of an empty taskID
 	task := a.GetTask(taskID)
 	ret := AnnotationStep{TaskID: taskID}
-	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value is NULL limit 1", task.ID))
+	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value is NULL", task.ID))
 	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("while fetching pending tasks: %w", err)
 	}
-	if rows.Next() {
-		err = rows.Scan(&ret.ImageID)
+	imageIDs := []string{}
+	for i := 0; i < a.OffsetAdvance; i++ {
+		if !rows.Next() {
+			break
+		}
+		var imageID string
+		err = rows.Scan(&imageID)
 		if err != nil {
 			return nil, err
 		}
+		imageIDs = append(imageIDs, imageID)
+	}
+	if len(imageIDs) > 0 {
+		ret.ImageID = imageIDs[rand.Intn(len(imageIDs))]
 		return &ret, nil
 	}
 	rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 limit 1", task.ID))
@@ -86,11 +101,20 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 	if err != nil {
 		return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
 	}
-	if rows.Next() {
-		err = rows.Scan(&ret.ImageID)
+	for i := 0; i < a.OffsetAdvance; i++ {
+		if !rows.Next() {
+			break
+		}
+		var imageID string
+		err = rows.Scan(&imageID)
 		if err != nil {
 			return nil, err
 		}
+		imageIDs = append(imageIDs, imageID)
+	}
+
+	if len(imageIDs) > 0 {
+		ret.ImageID = imageIDs[rand.Intn(len(imageIDs))]
 		return &ret, nil
 	}
 	return nil, nil
