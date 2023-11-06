@@ -92,27 +92,24 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		}
 		imageIDs = append(imageIDs, imageID)
 	}
-	if len(imageIDs) > 0 {
-		ret.ImageID = imageIDs[rand.Intn(len(imageIDs))]
-		return &ret, nil
-	}
-	rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 limit 1", task.ID))
-	defer rows.Close()
-	if err != nil {
-		return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
-	}
-	for i := 0; i < a.OffsetAdvance; i++ {
-		if !rows.Next() {
-			break
-		}
-		var imageID string
-		err = rows.Scan(&imageID)
+	if len(imageIDs) == 0 {
+		rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 limit 1", task.ID))
+		defer rows.Close()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
 		}
-		imageIDs = append(imageIDs, imageID)
+		for i := 0; i < a.OffsetAdvance; i++ {
+			if !rows.Next() {
+				break
+			}
+			var imageID string
+			err = rows.Scan(&imageID)
+			if err != nil {
+				return nil, err
+			}
+			imageIDs = append(imageIDs, imageID)
+		}
 	}
-
 	if len(imageIDs) > 0 {
 		ret.ImageID = imageIDs[rand.Intn(len(imageIDs))]
 		return &ret, nil
