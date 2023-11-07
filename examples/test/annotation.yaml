@@ -45,3 +45,42 @@ auth:
     password: 123
   calabreso:
     password: 123
+i18n:
+  - name: Project help
+    value: Ajuda do projeto
+  - name: Description
+    value: Descrição
+  - name: Phases
+    value: Fases
+  - name: Phase
+    value: Fase
+  - name: Possible choices
+    value: Escolhas possíveis
+  - name: (No name)
+    value: (Sem nome)
+  - name: (No description provided)
+    value: (Sem descrição fornecida)
+  - name: Examples
+    value: Exemplos
+  - name: Congratulations
+    value: Parabéns
+  - name: All annotations are done
+    value: Todas as anotações estão feitas
+  - name: Go to the main page
+    value: Ir para a página inicial
+  - name: annotation
+    value: anotação
+  - name: Welcome to go-annotator
+    value: Bem-vindo ao go-annotator
+  - name: Welcome
+    value: Bem-vindo
+  - name: Annotation instructions
+    value: Instruções de anotação
+  - name: Continue annotations
+    value: Continuar anotações
+  - name: Yes
+    value: Sim
+  - name: No
+    value: Não
+  - name: Copied to clipboard!
+    value: Copiado para a área de transferência!

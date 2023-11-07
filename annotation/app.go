@@ -23,6 +23,7 @@ type AnnotatorApp struct {
 	Database      *sql.DB
 	Config        *Config
 	OffsetAdvance int
+	i18n          map[string]string
 }
 
 func (a *AnnotatorApp) init() {
@@ -183,14 +184,14 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		itemPath := pathParts(r.URL.Path)
 		var markdownBuilder strings.Builder
 		title := "Help"
-		fmt.Fprintf(&markdownBuilder, "# [<](/) Project help\n")
-		fmt.Fprintf(&markdownBuilder, "## Description\n")
-		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, "(No description provided)"), "\n", "\n>"))
+		fmt.Fprintf(&markdownBuilder, "# [<](/) %s\n", i("Project help"))
+		fmt.Fprintf(&markdownBuilder, "## %s\n", i("Description"))
+		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, i("(No description provided)")), "\n", "\n>"))
 		if len(itemPath) == 1 {
-			fmt.Fprintf(&markdownBuilder, "## Phases\n\n")
+			fmt.Fprintf(&markdownBuilder, "## %s\n\n", i("Phases"))
 			for _, task := range a.Config.Tasks {
 				fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
-				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, "(No description provided)"), "\n", "\n>"))
+				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, i("(No description provided)")), "\n", "\n>"))
 			}
 		} else if len(itemPath) == 2 {
 			helpTask := itemPath[1]
@@ -199,17 +200,17 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 				http.NotFoundHandler().ServeHTTP(w, r)
 				return
 			}
-			fmt.Fprintf(&markdownBuilder, "## Phase: %s\n", task.ShortName)
+			fmt.Fprintf(&markdownBuilder, "## %s: %s\n", i("Phase"), task.ShortName)
 			fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, "(No description provided)"), "\n", "\n>"))
 
-			fmt.Fprintf(&markdownBuilder, "### Possible choices\n")
+			fmt.Fprintf(&markdownBuilder, "### %s\n", i("Possible choices"))
 			for k, v := range task.Classes {
-				fmt.Fprintf(&markdownBuilder, "#### %s (%s)\n", stringOr(v.Name, "(No name)"), k)
+				fmt.Fprintf(&markdownBuilder, "#### %s (%s)\n", i(stringOr(v.Name, "(No name)")), k)
 
-				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(v.Description, "(No description provided)"), "\n", "\n>"))
+				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(v.Description, i("(No description provided)")), "\n", "\n>"))
 				if v.Examples != nil && len(v.Examples) > 0 {
 
-					fmt.Fprintf(&markdownBuilder, "##### Examples\n")
+					fmt.Fprintf(&markdownBuilder, "##### %s \n", i("Examples"))
 					for _, example := range v.Examples {
 						fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", example)
 					}
@@ -234,10 +235,10 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 				return
 			}
 			if step == nil {
-				fmt.Fprintf(&markdownBuilder, "# Congratulations!\n")
-				fmt.Fprintf(&markdownBuilder, "All annotations are done!\n\n")
-				fmt.Fprintf(&markdownBuilder, "[Go to the main page](/)\n")
-				ExecTemplate(w, TemplateContent{Title: "All annotations done!", Content: markdownBuilder.String()})
+				fmt.Fprintf(&markdownBuilder, "# %s!\n", i("Congratulations"))
+				fmt.Fprintf(&markdownBuilder, "%s!\n\n", i("All annotations are done"))
+				fmt.Fprintf(&markdownBuilder, "[%s](/)\n", i("Go to the main page"))
+				ExecTemplate(w, TemplateContent{Title: i("All annotations are done!"), Content: markdownBuilder.String()})
 				return
 			}
 			http.Redirect(w, r, fmt.Sprintf("/annotate/%s/%s", step.TaskID, step.ImageID), http.StatusSeeOther)
@@ -247,7 +248,6 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 		taskID := itemPath[1]
 		imageID := itemPath[2]
-		log.Printf("taskID=%v imageID=%v", taskID, imageID)
 		task := a.GetTask(taskID)
 		if task == nil {
 			http.NotFoundHandler().ServeHTTP(w, r)
@@ -312,17 +312,17 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between">`)
 		for _, class := range classNames {
 			classMeta := task.Classes[class]
-			fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="%s" data_sure="on" hx-vals='js:{selectedClass: event.target.attributes.data_selectedClass.value, sure: event.target.attributes.data_sure.value}'>%s</button>`, thisURL, class, classMeta.Name)
+			fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="%s" data_sure="on" hx-vals='js:{selectedClass: event.target.attributes.data_selectedClass.value, sure: event.target.attributes.data_sure.value}'>%s</button>`, thisURL, class, i(classMeta.Name))
 		}
 		fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="" data_sure="off" hx-vals='js:{selectedClass: event.attributes.data_selectedClass.value, sure: event.attributes.data_sure.value}'>???</button>`, thisURL)
 
 		fmt.Fprintf(&markdownBuilder, `</div>`)
 
-		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('Copied to clipboard!')" style="overflow-x: hidden; text-align: center;">%s</p>`, filename)
+		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('%s')" style="overflow-x: hidden; text-align: center;">%s</p>`, i("Copied to clipboard!"), filename)
 
 		fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", imageID)
 
-		ExecTemplate(w, TemplateContent{Title: "annotation", Content: markdownBuilder.String()})
+		ExecTemplate(w, TemplateContent{Title: i("annotation"), Content: markdownBuilder.String()})
 	})
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
 		itemPath := pathParts(r.URL.Path)
@@ -364,13 +364,13 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var markdownBuilder strings.Builder
-		fmt.Fprintf(&markdownBuilder, "# Welcome to go-annotator\n")
+		fmt.Fprintf(&markdownBuilder, "# %s\n", i("Welcome to go-annotator"))
 		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(a.Config.Meta.Description, "\n", "\n>"))
 		fmt.Fprintf(&markdownBuilder, "\n\n")
-		fmt.Fprintf(&markdownBuilder, "[Annotation instructions](/help) ")
-		fmt.Fprintf(&markdownBuilder, "[Continue annotations](/annotate)")
+		fmt.Fprintf(&markdownBuilder, "[%s](/help) ", i("Annotation instructions"))
+		fmt.Fprintf(&markdownBuilder, "[%s](/annotate)", i("Continue annotations"))
 
-		ExecTemplate(w, TemplateContent{Title: "Welcome", Content: markdownBuilder.String()})
+		ExecTemplate(w, TemplateContent{Title: i("Welcome"), Content: markdownBuilder.String()})
 	})
 
 	log.Printf("images dir: %s", a.ImagesDir)

@@ -14,6 +14,12 @@ type Config struct {
 	} `yaml:"meta"`
 	Tasks          []*ConfigTask          `yaml:"tasks"`
 	Authentication map[string]*ConfigAuth `yaml:"auth"`
+	I18N           []ConfigI18N           `yaml:"i18n"`
+}
+
+type ConfigI18N struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
 }
 
 type ConfigAuth struct {
@@ -70,6 +76,18 @@ func LoadConfig(filename string) (*Config, error) {
 	}
 	if len(ret.Authentication) == 0 {
 		return nil, fmt.Errorf("no users specified")
+	}
+	if len(ret.I18N) > 0 {
+		for _, term := range ret.I18N {
+			if term.Name == "" {
+				return nil, fmt.Errorf("one i18n item is invalid: does not provide the name attribute")
+			}
+			if term.Value == "" {
+				return nil, fmt.Errorf("one i18n item is invalid: does not provide the value attribute")
+			}
+
+			_i18n[term.Name] = term.Value
+		}
 	}
 	for user := range ret.Authentication {
 		if ret.Authentication[user].Password == "" {
