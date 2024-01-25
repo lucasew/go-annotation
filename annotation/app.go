@@ -318,7 +318,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 
 		fmt.Fprintf(&markdownBuilder, `</div>`)
 
-		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('%s')" style="overflow-x: hidden; text-align: center;">%s</p>`, i("Copied to clipboard!"), filename)
+		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('%s')" style="font-family: monospace; overflow-x: hidden; text-align: center;">%s</p>`, i("Copied to clipboard!"), filename)
 
 		fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", imageID)
 
