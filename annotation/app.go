@@ -82,10 +82,10 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 
 	ret := AnnotationStep{TaskID: taskID}
 	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value is NULL %s", task.ID, filters))
-	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("while fetching pending tasks: %w", err)
 	}
+	defer rows.Close()
 	imageIDs := []string{}
 	for i := 0; i < a.OffsetAdvance; i++ {
 		if !rows.Next() {
@@ -100,10 +100,10 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 	}
 	if len(imageIDs) == 0 {
 		rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 %s", task.ID, filters))
-		defer rows.Close()
 		if err != nil {
 			return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
 		}
+		defer rows.Close()
 		for i := 0; i < a.OffsetAdvance; i++ {
 			if !rows.Next() {
 				break
@@ -125,10 +125,10 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 
 func (a *AnnotatorApp) GetFilenameFromHash(ctx context.Context, hash string) (filename string, err error) {
 	rows, err := a.Database.QueryContext(ctx, "select filename from images where sha256 = ?", hash)
-	defer rows.Close()
 	if err != nil {
 		return "", err
 	}
+	defer rows.Close()
 	if !rows.Next() {
 		return "", fmt.Errorf("No filename found for hash")
 	}
@@ -146,10 +146,10 @@ type AnnotationResponse struct {
 
 func (a *AnnotatorApp) SubmitAnnotation(ctx context.Context, annotation AnnotationResponse) error {
 	tx, err := a.Database.BeginTx(ctx, &sql.TxOptions{})
-	defer tx.Rollback()
 	if err != nil {
 		return fmt.Errorf("while starting transaction: %w", err)
 	}
+	defer tx.Rollback()
 	task := a.GetTask(annotation.TaskID)
 	if task == nil {
 		return fmt.Errorf("no such task") // did you check for the task before calling this?
@@ -412,10 +412,10 @@ func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
 	a.init()
 	log.Printf("PrepareDatabase: starting transaction")
 	tx, err := a.Database.BeginTx(ctx, &sql.TxOptions{})
-	defer tx.Rollback()
 	if err != nil {
 		return fmt.Errorf("while starting database setup transaction: %w", err)
 	}
+	defer tx.Rollback()
 	log.Printf("PrepareDatabase: setting up images table")
 	_, err = tx.Exec(`
 create table if not exists images (
