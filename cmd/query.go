@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func PrintQuery(ctx context.Context, db *sql.DB, query string, args ...interface{}) error {
+func PrintQuery(ctx context.Context, db *sql.Tx, query string, args ...interface{}) error {
 	stmt, err := db.PrepareContext(ctx, query)
 	if err != nil {
 		return err
@@ -67,13 +67,21 @@ to quickly create a Cobra application.`,
 		defer db.Close()
 		// spew.Dump(db)
 
+		tx, err := db.BeginTx(cmd.Context(), &sql.TxOptions{
+			Isolation: sql.LevelReadUncommitted,
+		})
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
 		queryArgs := []interface{}{}
 		query := ""
 		if len(args) < 2 {
-			return PrintQuery(cmd.Context(), db, "select distinct substr(tbl_name, 6) from SQLITE_MASTER where tbl_name like 'task_%'")
+			return PrintQuery(cmd.Context(), tx, "select distinct substr(tbl_name, 6) from SQLITE_MASTER where tbl_name like 'task_%'")
 		}
 		if len(args) < 3 {
-			return PrintQuery(cmd.Context(), db, fmt.Sprintf("select distinct value from task_%s where sure = 1", args[1]))
+			return PrintQuery(cmd.Context(), tx, fmt.Sprintf("select distinct value from task_%s where sure = 1", args[1]))
 		}
 
 		if fetchHash {
@@ -93,7 +101,7 @@ to quickly create a Cobra application.`,
 			queryArgs = append(queryArgs, args[3], args[3])
 		}
 
-		return PrintQuery(cmd.Context(), db, query, queryArgs...)
+		return PrintQuery(cmd.Context(), tx, query, queryArgs...)
 	},
 }
 
