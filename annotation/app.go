@@ -146,10 +146,10 @@ type AnnotationResponse struct {
 
 func (a *AnnotatorApp) SubmitAnnotation(ctx context.Context, annotation AnnotationResponse) error {
 	tx, err := a.Database.BeginTx(ctx, &sql.TxOptions{})
-	defer tx.Rollback()
 	if err != nil {
 		return fmt.Errorf("while starting transaction: %w", err)
 	}
+	defer tx.Rollback()
 	task := a.GetTask(annotation.TaskID)
 	if task == nil {
 		return fmt.Errorf("no such task") // did you check for the task before calling this?
@@ -278,17 +278,20 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			if err != nil {
 				log.Printf("error while submitting annotation: %s", err)
 				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			step, err := a.NextAnnotationStep(r.Context(), taskID)
 			if err != nil {
 				log.Printf("error while getting next step: %s", err)
 				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			if step == nil {
 				step, err = a.NextAnnotationStep(r.Context(), "")
 				if err != nil {
 					log.Printf("error while getting next step at the end of task: %s", err)
 					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 			}
 			if step == nil {
@@ -409,10 +412,10 @@ func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
 	a.init()
 	log.Printf("PrepareDatabase: starting transaction")
 	tx, err := a.Database.BeginTx(ctx, &sql.TxOptions{})
-	defer tx.Rollback()
 	if err != nil {
 		return fmt.Errorf("while starting database setup transaction: %w", err)
 	}
+	defer tx.Rollback()
 	log.Printf("PrepareDatabase: setting up images table")
 	_, err = tx.Exec(`
 create table if not exists images (
