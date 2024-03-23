@@ -67,6 +67,9 @@ func LoadConfig(filename string) (*Config, error) {
 		if task.Type == "" {
 			task.Type = "class"
 		}
+		if task.ShortName == "" {
+			task.ShortName = task.Name
+		}
 		if task.Classes == nil {
 			task.Classes = getClassesFromClassType(task.Type)
 		}

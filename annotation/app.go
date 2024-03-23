@@ -317,7 +317,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			classMeta := task.Classes[class]
 			fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="%s" data_sure="on" hx-vals='js:{selectedClass: event.target.attributes.data_selectedClass.value, sure: event.target.attributes.data_sure.value}'>%s</button>`, thisURL, class, i(classMeta.Name))
 		}
-		fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="" data_sure="off" hx-vals='js:{selectedClass: event.attributes.data_selectedClass.value, sure: event.attributes.data_sure.value}'>???</button>`, thisURL)
+		fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="???" data_sure="off" hx-vals='js:{selectedClass: event.attributes.data_selectedClass.value, sure: event.attributes.data_sure.value}'>???</button>`, thisURL)
 
 		fmt.Fprintf(&markdownBuilder, `</div>`)
 
