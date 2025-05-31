@@ -77,8 +77,8 @@ jobs:
       run: 'nix build .#'
 
     - run: mkdir build -p && ls && pwd
-    - run: GOOS=windows GOARCH=amd64 go build -o build/ts-proxyd-windows-amd64.exe ./cmd/ts-proxyd
-    - run: go build -o build/ts-proxyd-linux-amd64 ./cmd/ts-proxyd
+    - run: GOOS=windows GOARCH=amd64 go build -o build/go-annotation-windows-amd64.exe ./cmd
+    - run: go build -o build/go-annotation-linux-amd64 ./cmd
 
     - name: Make release if everything looks right
       env:
