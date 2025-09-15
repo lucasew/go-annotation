@@ -27,10 +27,6 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-    - name: Install Nix
-      uses: cachix/install-nix-action@v31
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
     - name: Login to registry
       uses: docker/login-action@v3
       with:
@@ -44,12 +40,6 @@ jobs:
       run: |
         git config user.name actions-bot
         git config user.email actions-bot@users.noreply.github.com
-
-    - name: Update Nix flake
-      run: nix flake update
-
-    - name: Update Nix hashes
-      run: ./.github/update-nix-hashes.py
 
     - name: Create Pull Request if there is new stuff from updaters
       uses: peter-evans/create-pull-request@v7
@@ -88,13 +78,6 @@ jobs:
           GOOS=$GOOS GOARCH=$GOARCH go build -v -o build/go-annotation-$GOOS-$GOARCH ./cmd && (echo "- $GOOS/$GOARCH" >> $GITHUB_STEP_SUMMARY) || true
           echo "::endgroup::"
         done
-
-    - name: Try to build it
-      run: 'nix build .#'
-
-    - run: mkdir build -p && ls && pwd
-    - run: GOOS=windows GOARCH=amd64 go build -o build/go-annotation-windows-amd64.exe ./cmd
-    - run: go build -o build/go-annotation-linux-amd64 ./cmd
 
     - name: Make release if everything looks right
       env:
