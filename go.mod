@@ -2,7 +2,7 @@ module github.com/lucasew/go-annotation
 
 go 1.23.0
 
-toolchain go1.25.1
+toolchain go1.25.2
 
 require (
 	github.com/davecgh/go-spew v1.1.1
