@@ -46,6 +46,7 @@ jobs:
 
     - name: Create Pull Request if there is new stuff from updaters
       uses: peter-evans/create-pull-request@v7
+      if: github.event_name != 'pull_request'
       id: pr_create
       with:
         commit-message: Updater script changes
