@@ -17,6 +17,8 @@ import (
 	"strings"
 
 	"math/rand"
+
+	"github.com/russross/blackfriday"
 )
 
 type AnnotatorApp struct {
