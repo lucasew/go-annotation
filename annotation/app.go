@@ -178,40 +178,11 @@ func (a *AnnotatorApp) GetTask(taskID string) *ConfigTask {
 	return nil
 }
 
-// TemplateData structures for the new templates
-type HomeData struct {
-	Title       string
-	CSS         template.CSS
-	ProjectName string
-	Description string
-}
-
-type HelpData struct {
-	Title   string
-	CSS     template.CSS
-	Content template.HTML
-	Tasks   []*ConfigTask
-}
-
-type AnnotateData struct {
-	Title         string
-	CSS           template.CSS
-	TaskID        string
-	TaskName      string
-	ImageID       string
-	ImageFilename string
-	Classes       []ClassButton
-}
-
+// ClassButton represents a class button with keyboard shortcut
 type ClassButton struct {
 	ID   string
 	Name string
 	Key  string
-}
-
-type CompleteData struct {
-	Title string
-	CSS   template.CSS
 }
 
 func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
@@ -225,14 +196,13 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			return
 		}
 
-		data := HomeData{
-			Title:       i("Welcome to go-annotator"),
-			CSS:         template.CSS(cssContent),
-			ProjectName: i("Welcome to go-annotator"),
-			Description: a.Config.Meta.Description,
+		data := map[string]interface{}{
+			"Title":       i("Welcome to go-annotator"),
+			"ProjectName": i("Welcome to go-annotator"),
+			"Description": a.Config.Meta.Description,
 		}
 
-		err := Template.ExecuteTemplate(w, "home_page.html", data)
+		err := RenderPage(w, "home.html", data)
 		if err != nil {
 			log.Printf("error rendering home template: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -286,14 +256,20 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			return
 		}
 
-		data := HelpData{
-			Title:   title,
-			CSS:     template.CSS(cssContent),
-			Content: template.HTML(markdownBuilder.String()),
-			Tasks:   tasks,
+		// Convert markdown to HTML
+		htmlContent := blackfriday.MarkdownCommon([]byte(markdownBuilder.String()))
+
+		data := map[string]interface{}{
+			"Title":       title,
+			"HTMLContent": template.HTML(htmlContent),
+			"Tasks":       tasks,
 		}
 
-		ExecTemplate(w, TemplateContent{Title: title, Content: markdownBuilder.String()})
+		err := RenderPage(w, "help.html", data)
+		if err != nil {
+			log.Printf("error rendering help template: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 
 	// Annotate pages
@@ -308,11 +284,10 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 				return
 			}
 			if step == nil {
-				data := CompleteData{
-					Title: i("All annotations are done!"),
-					CSS:   template.CSS(cssContent),
+				data := map[string]interface{}{
+					"Title": i("All annotations are done!"),
 				}
-				err := Template.ExecuteTemplate(w, "complete_page.html", data)
+				err := RenderPage(w, "complete.html", data)
 				if err != nil {
 					log.Printf("error rendering complete template: %s", err)
 				}
@@ -403,17 +378,16 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			})
 		}
 
-		data := AnnotateData{
-			Title:         i("annotation"),
-			CSS:           template.CSS(cssContent),
-			TaskID:        taskID,
-			TaskName:      task.Name,
-			ImageID:       imageID,
-			ImageFilename: filename,
-			Classes:       classes,
+		data := map[string]interface{}{
+			"Title":         i("annotation"),
+			"TaskID":        taskID,
+			"TaskName":      task.Name,
+			"ImageID":       imageID,
+			"ImageFilename": filename,
+			"Classes":       classes,
 		}
 
-		err := Template.ExecuteTemplate(w, "annotate_page.html", data)
+		err := RenderPage(w, "annotate.html", data)
 		if err != nil {
 			log.Printf("error rendering annotate template: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
