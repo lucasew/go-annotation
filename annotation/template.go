@@ -14,13 +14,13 @@ var (
 	cssContent string
 
 	// Template manager with mold for layout support
-	TemplateManager *TemplateManager = nil
+	templateManager *TemplateManager = nil
 )
 
 func init() {
 	// Initialize template manager with mold
-	TemplateManager = NewTemplateManager()
-	if err := TemplateManager.LoadFromFS(templateFS, "templates/layouts/*.html", "templates/pages/*.html"); err != nil {
+	templateManager = NewTemplateManager()
+	if err := templateManager.LoadFromFS(templateFS, "templates/layouts/*.html", "templates/pages/*.html"); err != nil {
 		panic(err)
 	}
 }
@@ -33,7 +33,7 @@ func RenderPage(w io.Writer, pageName string, data map[string]interface{}) error
 	}
 	data["CSS"] = template.CSS(cssContent)
 
-	return TemplateManager.Render(w, "pages/"+pageName, data)
+	return templateManager.Render(w, "pages/"+pageName, data)
 }
 
 // RenderPageWithTitle is a convenience function to render a page with just a title
