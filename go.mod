@@ -15,6 +15,7 @@ require (
 )
 
 require (
+	github.com/abiosoft/mold v0.0.0-20250328135240-0a4c28cb836a // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
