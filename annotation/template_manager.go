@@ -2,9 +2,9 @@ package annotation
 
 import (
 	"embed"
-	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"sync"
 
 	"github.com/abiosoft/mold"
@@ -12,8 +12,8 @@ import (
 
 // TemplateManager manages templates using mold for layout inheritance
 type TemplateManager struct {
-	mold *mold.Mold
-	mu   sync.RWMutex
+	engine mold.Engine
+	mu     sync.RWMutex
 }
 
 // BlockData represents data that can be passed to templates
@@ -25,57 +25,31 @@ type BlockData struct {
 }
 
 // NewTemplateManager creates a new template manager using mold
-func NewTemplateManager() *TemplateManager {
-	return &TemplateManager{
-		mold: mold.New(),
+// The fs should be an embed.FS containing your templates
+func NewTemplateManager(templateFS embed.FS, options ...mold.Option) (*TemplateManager, error) {
+	// Use WithRoot to specify the templates subdirectory
+	opts := append([]mold.Option{mold.WithRoot("templates")}, options...)
+
+	engine, err := mold.New(templateFS, opts...)
+	if err != nil {
+		return nil, err
 	}
+
+	return &TemplateManager{
+		engine: engine,
+	}, nil
 }
 
-// LoadFromFS loads templates from an embedded filesystem
-func (tm *TemplateManager) LoadFromFS(fs embed.FS, layoutPattern, pagePattern string) error {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
-
-	// Load all templates from the filesystem
-	// Mold will handle the layout/page relationship automatically
-
-	// Load layouts
-	layoutFiles, err := fs.ReadDir("templates/layouts")
-	if err == nil {
-		for _, file := range layoutFiles {
-			if file.IsDir() {
-				continue
-			}
-			name := "layouts/" + file.Name()
-			content, err := fs.ReadFile("templates/" + name)
-			if err != nil {
-				return fmt.Errorf("failed to read layout %s: %w", name, err)
-			}
-			if err := tm.mold.ParseTemplate(name, string(content)); err != nil {
-				return fmt.Errorf("failed to parse layout %s: %w", name, err)
-			}
-		}
+// NewTemplateManagerWithFS creates a template manager from a plain fs.FS
+func NewTemplateManagerWithFS(fsys fs.FS, options ...mold.Option) (*TemplateManager, error) {
+	engine, err := mold.New(fsys, options...)
+	if err != nil {
+		return nil, err
 	}
 
-	// Load pages
-	pageFiles, err := fs.ReadDir("templates/pages")
-	if err == nil {
-		for _, file := range pageFiles {
-			if file.IsDir() {
-				continue
-			}
-			name := "pages/" + file.Name()
-			content, err := fs.ReadFile("templates/" + name)
-			if err != nil {
-				return fmt.Errorf("failed to read page %s: %w", name, err)
-			}
-			if err := tm.mold.ParseTemplate(name, string(content)); err != nil {
-				return fmt.Errorf("failed to parse page %s: %w", name, err)
-			}
-		}
-	}
-
-	return nil
+	return &TemplateManager{
+		engine: engine,
+	}, nil
 }
 
 // Render renders a page template (mold will automatically handle layout inheritance)
@@ -83,7 +57,7 @@ func (tm *TemplateManager) Render(w io.Writer, pageName string, data interface{}
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
-	return tm.mold.ExecuteTemplate(w, pageName, data)
+	return tm.engine.Render(w, pageName, data)
 }
 
 // RenderWithBlocks renders a template with explicit block definitions
@@ -93,20 +67,7 @@ func (tm *TemplateManager) RenderWithBlocks(w io.Writer, templateName string, bl
 
 // AddFuncMap adds custom template functions
 func (tm *TemplateManager) AddFuncMap(funcMap template.FuncMap) {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
-
-	// Convert template.FuncMap to mold.FuncMap
-	moldFuncs := make(map[string]interface{})
-	for k, v := range funcMap {
-		moldFuncs[k] = v
-	}
-	tm.mold.Funcs(moldFuncs)
-}
-
-// ParseTemplate parses and adds a template dynamically
-func (tm *TemplateManager) ParseTemplate(name, content string) error {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
-	return tm.mold.ParseTemplate(name, content)
+	// Note: With the new mold API, functions should be added during creation using WithFuncMap
+	// This method is kept for backwards compatibility but won't work with an already-created engine
+	// Consider recreating the engine with WithFuncMap option instead
 }
