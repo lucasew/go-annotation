@@ -19,8 +19,10 @@ var (
 
 func init() {
 	// Initialize template manager with mold
-	templateManager = NewTemplateManager()
-	if err := templateManager.LoadFromFS(templateFS, "templates/layouts/*.html", "templates/pages/*.html"); err != nil {
+	// Mold will automatically parse all templates from the embed.FS
+	var err error
+	templateManager, err = NewTemplateManager(templateFS)
+	if err != nil {
 		panic(err)
 	}
 }
