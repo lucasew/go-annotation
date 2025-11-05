@@ -71,6 +71,12 @@ jobs:
           exit 1
         fi
 
+    - name: Install frontend dependencies
+      run: npm install
+
+    - name: Generate CSS assets
+      run: npm run build:css
+
     - name: Build binaries
       env:
         TAG: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}

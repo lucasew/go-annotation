@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
+    <style>{{.CSS}}</style>
+</head>
+<body class="bg-base-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="breadcrumbs text-sm mb-4">
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/help/{{.TaskID}}">{{.TaskName}}</a></li>
+            <li>Annotate</li>
+          </ul>
+        </div>
+
+        <div class="card bg-base-200 shadow-xl mb-4">
+          <div class="card-body">
+            <div class="flex justify-between items-center">
+              <h2 class="card-title">{{.TaskName}}</h2>
+              <a href="/help/{{.TaskID}}" class="btn btn-sm btn-ghost">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="annotation-buttons mb-6" id="annotation-controls">
+          {{range $idx, $class := .Classes}}
+          <button
+            class="btn btn-primary btn-lg flex-1 min-w-[150px]"
+            hx-post="/annotate/{{$.TaskID}}/{{$.ImageID}}"
+            hx-vals='{"selectedClass": "{{$class.ID}}", "sure": "on"}'
+            data-key="{{$class.Key}}">
+            {{$class.Name}}
+            {{if $class.Key}}<kbd class="kbd kbd-sm ml-2">{{$class.Key}}</kbd>{{end}}
+          </button>
+          {{end}}
+          <button
+            class="btn btn-warning btn-lg flex-1 min-w-[150px]"
+            hx-post="/annotate/{{.TaskID}}/{{.ImageID}}"
+            hx-vals='{"selectedClass": "", "sure": "off"}'
+            data-key="?">
+            Not Sure <kbd class="kbd kbd-sm ml-2">?</kbd>
+          </button>
+        </div>
+
+        <div class="alert alert-info mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <p class="font-mono text-sm cursor-pointer" id="image-id" onclick="navigator.clipboard.writeText(this.innerText); alert('Copied to clipboard!')">
+              {{.ImageFilename}}
+            </p>
+          </div>
+        </div>
+
+        <div class="image-container">
+          <img src="/asset/{{.ImageID}}" alt="Image to annotate" class="rounded-lg shadow-2xl" />
+        </div>
+
+        <script>
+          // Keyboard shortcuts for annotation
+          document.addEventListener('keydown', function(e) {
+            const buttons = document.querySelectorAll('#annotation-controls button[data-key]');
+            buttons.forEach(button => {
+              const key = button.getAttribute('data-key');
+              if (key && e.key.toLowerCase() === key.toLowerCase()) {
+                e.preventDefault();
+                button.click();
+              }
+            });
+          });
+        </script>
+    </div>
+</body>
+</html>

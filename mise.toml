@@ -1,2 +1,16 @@
 [tools]
 go = "1.25.4"
+node = "22"
+
+[tasks.gen]
+description = "Generate all assets"
+depends = ["gen:*"]
+
+[tasks."gen:css"]
+description = "Generate CSS from Tailwind"
+run = "npm run build:css"
+
+[tasks.ci]
+description = "Run CI checks (gen + build)"
+depends = ["gen"]
+run = "go build -v ."
