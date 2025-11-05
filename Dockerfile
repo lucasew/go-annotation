@@ -14,7 +14,7 @@ ENV VERSION_LONG=$VERSION_LONG
 ARG VERSION_GIT
 ENV VERSION_GIT=$VERSION_GIT
 
-RUN go build -v -o go-annotation ./cmd
+RUN go build -v -o go-annotation ./cmd/go-annotation
 
 FROM alpine:3.22
 
