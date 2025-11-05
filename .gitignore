@@ -1,3 +1,6 @@
 result
 build
 build
+
+node_modules/
+assets/css/output.css

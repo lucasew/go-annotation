@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"io/fs"
 	"log"
@@ -177,18 +178,82 @@ func (a *AnnotatorApp) GetTask(taskID string) *ConfigTask {
 	return nil
 }
 
+// TemplateData structures for the new templates
+type HomeData struct {
+	Title       string
+	CSS         template.CSS
+	ProjectName string
+	Description string
+}
+
+type HelpData struct {
+	Title   string
+	CSS     template.CSS
+	Content template.HTML
+	Tasks   []*ConfigTask
+}
+
+type AnnotateData struct {
+	Title         string
+	CSS           template.CSS
+	TaskID        string
+	TaskName      string
+	ImageID       string
+	ImageFilename string
+	Classes       []ClassButton
+}
+
+type ClassButton struct {
+	ID   string
+	Name string
+	Key  string
+}
+
+type CompleteData struct {
+	Title string
+	CSS   template.CSS
+}
+
 func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	a.init()
 	mux := http.NewServeMux()
+
+	// Home page
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFoundHandler().ServeHTTP(w, r)
+			return
+		}
+
+		data := HomeData{
+			Title:       i("Welcome to go-annotator"),
+			CSS:         template.CSS(cssContent),
+			ProjectName: i("Welcome to go-annotator"),
+			Description: a.Config.Meta.Description,
+		}
+
+		err := Template.ExecuteTemplate(w, "home_page.html", data)
+		if err != nil {
+			log.Printf("error rendering home template: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+
+	// Help pages
 	mux.HandleFunc("/help/", func(w http.ResponseWriter, r *http.Request) {
 		itemPath := pathParts(r.URL.Path)
 		var markdownBuilder strings.Builder
 		title := "Help"
+
 		fmt.Fprintf(&markdownBuilder, "# [<](/) %s\n", i("Project help"))
 		fmt.Fprintf(&markdownBuilder, "## %s\n", i("Description"))
 		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, i("(No description provided)")), "\n", "\n>"))
+
+		var tasks []*ConfigTask = nil
+
 		if len(itemPath) == 1 {
 			fmt.Fprintf(&markdownBuilder, "## %s\n\n", i("Phases"))
+			tasks = a.Config.Tasks
 			for _, task := range a.Config.Tasks {
 				fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
 				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, i("(No description provided)")), "\n", "\n>"))
@@ -220,11 +285,19 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
+
+		data := HelpData{
+			Title:   title,
+			CSS:     template.CSS(cssContent),
+			Content: template.HTML(markdownBuilder.String()),
+			Tasks:   tasks,
+		}
+
 		ExecTemplate(w, TemplateContent{Title: title, Content: markdownBuilder.String()})
 	})
 
+	// Annotate pages
 	mux.HandleFunc("/annotate/", func(w http.ResponseWriter, r *http.Request) {
-		var markdownBuilder strings.Builder
 		itemPath := pathParts(r.URL.Path)
 
 		if len(itemPath) != 3 {
@@ -235,14 +308,17 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 				return
 			}
 			if step == nil {
-				fmt.Fprintf(&markdownBuilder, "# %s!\n", i("Congratulations"))
-				fmt.Fprintf(&markdownBuilder, "%s!\n\n", i("All annotations are done"))
-				fmt.Fprintf(&markdownBuilder, "[%s](/)\n", i("Go to the main page"))
-				ExecTemplate(w, TemplateContent{Title: i("All annotations are done!"), Content: markdownBuilder.String()})
+				data := CompleteData{
+					Title: i("All annotations are done!"),
+					CSS:   template.CSS(cssContent),
+				}
+				err := Template.ExecuteTemplate(w, "complete_page.html", data)
+				if err != nil {
+					log.Printf("error rendering complete template: %s", err)
+				}
 				return
 			}
 			http.Redirect(w, r, fmt.Sprintf("/annotate/%s/%s", step.TaskID, step.ImageID), http.StatusSeeOther)
-
 			return
 		}
 
@@ -303,30 +379,48 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			}
 			return
 		}
+
+		// Build classes with keyboard shortcuts
 		classNames := make([]string, 0, len(task.Classes))
 		for class := range task.Classes {
 			classNames = append(classNames, class)
 		}
 		sort.Sort(sort.StringSlice(classNames))
 
-		fmt.Fprintf(&markdownBuilder, "# [<](/) %s [???](/help/%s) \n", task.Name, task.ID)
-		thisURL := fmt.Sprintf("/annotate/%s/%s", taskID, imageID)
-
-		fmt.Fprintf(&markdownBuilder, `<div style="display: flex; flex-wrap: wrap; flex: 1; justify-content: space-between">`)
-		for _, class := range classNames {
-			classMeta := task.Classes[class]
-			fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="%s" data_sure="on" hx-vals='js:{selectedClass: event.target.attributes.data_selectedClass.value, sure: event.target.attributes.data_sure.value}'>%s</button>`, thisURL, class, i(classMeta.Name))
+		classes := []ClassButton{}
+		keyIndex := 1
+		for _, className := range classNames {
+			classMeta := task.Classes[className]
+			key := ""
+			if keyIndex <= 9 {
+				key = fmt.Sprintf("%d", keyIndex)
+				keyIndex++
+			}
+			classes = append(classes, ClassButton{
+				ID:   className,
+				Name: i(classMeta.Name),
+				Key:  key,
+			})
 		}
-		fmt.Fprintf(&markdownBuilder, `<button style="display: flex; flex: 1" hx-post="%s" data_selectedClass="???" data_sure="off" hx-vals="js:{selectedClass: '', sure: 'off'}">???</button>`, thisURL)
 
-		fmt.Fprintf(&markdownBuilder, `</div>`)
+		data := AnnotateData{
+			Title:         i("annotation"),
+			CSS:           template.CSS(cssContent),
+			TaskID:        taskID,
+			TaskName:      task.Name,
+			ImageID:       imageID,
+			ImageFilename: filename,
+			Classes:       classes,
+		}
 
-		fmt.Fprintf(&markdownBuilder, `<p id="image_id" hx-on:click="navigator.clipboard.writeText(this.innerText); alert('%s')" style="font-family: monospace; overflow-x: hidden; text-align: center;">%s</p>`, i("Copied to clipboard!"), filename)
-
-		fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", imageID)
-
-		ExecTemplate(w, TemplateContent{Title: i("annotation"), Content: markdownBuilder.String()})
+		err := Template.ExecuteTemplate(w, "annotate_page.html", data)
+		if err != nil {
+			log.Printf("error rendering annotate template: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
+
+	// Asset handler
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
 		itemPath := pathParts(r.URL.Path)
 		if len(itemPath) != 2 {
@@ -350,7 +444,6 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		var filename string
 		rows.Scan(&filename)
 		log.Printf("http: asset id %s is %s!", image_id, filename)
-		// TODO: fetch image filename from database
 		f, err := os.Open(path.Join(a.ImagesDir, filename))
 		defer f.Close()
 		if errors.Is(err, os.ErrNotExist) {
@@ -363,17 +456,6 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			return
 		}
 		io.Copy(w, f)
-	})
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		var markdownBuilder strings.Builder
-		fmt.Fprintf(&markdownBuilder, "# %s\n", i("Welcome to go-annotator"))
-		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(a.Config.Meta.Description, "\n", "\n>"))
-		fmt.Fprintf(&markdownBuilder, "\n\n")
-		fmt.Fprintf(&markdownBuilder, "[%s](/help) ", i("Annotation instructions"))
-		fmt.Fprintf(&markdownBuilder, "[%s](/annotate)", i("Continue annotations"))
-
-		ExecTemplate(w, TemplateContent{Title: i("Welcome"), Content: markdownBuilder.String()})
 	})
 
 	log.Printf("images dir: %s", a.ImagesDir)
