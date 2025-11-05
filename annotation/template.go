@@ -4,59 +4,25 @@ import (
 	"embed"
 	"html/template"
 	"io"
-
-	"github.com/russross/blackfriday"
 )
 
 var (
-	//go:embed tmpl/*
-	oldTemplateFiles embed.FS
-
 	//go:embed templates/**/*
 	templateFS embed.FS
 
 	//go:embed assets/css/output.css
 	cssContent string
 
-	// Legacy template system
-	Template *template.Template = nil
-
-	// New template manager with mold for layout support
+	// Template manager with mold for layout support
 	TemplateManager *TemplateManager = nil
 )
 
 func init() {
-	// Initialize legacy template system for backward compatibility
-	Template = template.Must(template.ParseFS(templateFS, "templates/*.html"))
-
-	// Initialize new template manager with mold
+	// Initialize template manager with mold
 	TemplateManager = NewTemplateManager()
 	if err := TemplateManager.LoadFromFS(templateFS, "templates/layouts/*.html", "templates/pages/*.html"); err != nil {
 		panic(err)
 	}
-}
-
-// TemplateContent represents legacy template content
-type TemplateContent struct {
-	Title   string
-	Content string
-}
-
-type templateRuntimeContent struct {
-	Title   string
-	Content template.HTML
-	CSS     template.CSS
-}
-
-// ExecTemplate executes a template using the legacy system (for backward compatibility)
-func ExecTemplate(w io.Writer, content TemplateContent) error {
-	htmlized := blackfriday.MarkdownCommon([]byte(content.Content))
-	templateContent := templateRuntimeContent{
-		Title:   content.Title,
-		Content: template.HTML(string(htmlized)),
-		CSS:     template.CSS(cssContent),
-	}
-	return Template.ExecuteTemplate(w, "base.html", templateContent)
 }
 
 // RenderPage renders a page using mold with automatic CSS injection
