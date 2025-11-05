@@ -21,7 +21,7 @@ var (
 	// Legacy template system
 	Template *template.Template = nil
 
-	// New template manager with layout support
+	// New template manager with mold for layout support
 	TemplateManager *TemplateManager = nil
 )
 
@@ -29,7 +29,7 @@ func init() {
 	// Initialize legacy template system for backward compatibility
 	Template = template.Must(template.ParseFS(templateFS, "templates/*.html"))
 
-	// Initialize new template manager
+	// Initialize new template manager with mold
 	TemplateManager = NewTemplateManager()
 	if err := TemplateManager.LoadFromFS(templateFS, "templates/layouts/*.html", "templates/pages/*.html"); err != nil {
 		panic(err)
@@ -59,35 +59,22 @@ func ExecTemplate(w io.Writer, content TemplateContent) error {
 	return Template.ExecuteTemplate(w, "base.html", templateContent)
 }
 
-// RenderPage renders a page using the new template manager with layout and blocks
+// RenderPage renders a page using mold with automatic CSS injection
 func RenderPage(w io.Writer, pageName string, data map[string]interface{}) error {
-	// Add CSS to blocks
-	blocks := map[string]interface{}{
-		"CSS": template.CSS(cssContent),
+	// Inject CSS automatically
+	if data == nil {
+		data = make(map[string]interface{})
 	}
+	data["CSS"] = template.CSS(cssContent)
 
-	// Merge any existing blocks from data
-	if existingBlocks, ok := data["Blocks"].(map[string]interface{}); ok {
-		for k, v := range existingBlocks {
-			blocks[k] = v
-		}
-	}
-
-	// Create BlockData
-	blockData := BlockData{
-		Title:  getStringFromMap(data, "Title"),
-		Data:   data,
-		Blocks: blocks,
-	}
-
-	return TemplateManager.Render(w, "base.html", pageName, blockData)
+	return TemplateManager.Render(w, "pages/"+pageName, data)
 }
 
 // RenderPageWithTitle is a convenience function to render a page with just a title
 func RenderPageWithTitle(w io.Writer, pageName, title string, data interface{}) error {
 	dataMap := make(map[string]interface{})
 
-	// Convert data to map if it's a struct
+	// Set title
 	dataMap["Title"] = title
 
 	// If data is already a map, merge it
@@ -95,19 +82,9 @@ func RenderPageWithTitle(w io.Writer, pageName, title string, data interface{}) 
 		for k, v := range m {
 			dataMap[k] = v
 		}
-	} else {
+	} else if data != nil {
 		dataMap["Data"] = data
 	}
 
 	return RenderPage(w, pageName, dataMap)
-}
-
-// Helper function to get string from map
-func getStringFromMap(m map[string]interface{}, key string) string {
-	if v, ok := m[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
 }
