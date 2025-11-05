@@ -13,4 +13,4 @@ run = "npm run build:css"
 [tasks.ci]
 description = "Run CI checks (gen + build)"
 depends = ["gen"]
-run = "go build -v ."
+run = "go build -v ./cmd/go-annotation"

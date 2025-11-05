@@ -91,7 +91,7 @@ jobs:
         export CGO_ENABLED=0
         go tool dist list | grep -v wasm | while IFS=/ read -r GOOS GOARCH; do
           echo "::group::Build $GOOS/$GOARCH"
-          GOOS=$GOOS GOARCH=$GOARCH go build -v -o build/go-annotation-$GOOS-$GOARCH . && (echo "- $GOOS/$GOARCH" >> $GITHUB_STEP_SUMMARY) || true
+          GOOS=$GOOS GOARCH=$GOARCH go build -v -o build/go-annotation-$GOOS-$GOARCH ./cmd/go-annotation && (echo "- $GOOS/$GOARCH" >> $GITHUB_STEP_SUMMARY) || true
           echo "::endgroup::"
         done
 
