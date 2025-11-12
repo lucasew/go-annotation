@@ -894,10 +894,26 @@ func (a *AnnotatorApp) authenticationMiddleware(handler http.Handler) http.Handl
 	})
 }
 
+// PrepareDatabase runs both database migrations and image ingestion synchronously.
+// For better startup performance, consider using PrepareDatabaseMigrations() synchronously
+// and IngestImages() asynchronously instead.
 func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
+	if err := a.PrepareDatabaseMigrations(ctx); err != nil {
+		return err
+	}
+	if err := a.IngestImages(ctx); err != nil {
+		return err
+	}
+	log.Printf("PrepareDatabase: success! Database is ready")
+	return nil
+}
+
+// PrepareDatabaseMigrations runs database schema migrations.
+// This must be called synchronously before starting the HTTP server.
+func (a *AnnotatorApp) PrepareDatabaseMigrations(ctx context.Context) error {
 	a.init()
 
-	log.Printf("PrepareDatabase: running database migrations")
+	log.Printf("PrepareDatabaseMigrations: running database migrations")
 	// Run the migration SQL to create the new schema
 	migrationSQL := `
 -- Images table stores information about images to be annotated
@@ -931,8 +947,16 @@ CREATE INDEX IF NOT EXISTS idx_annotations_stage ON annotations(stage_index);
 		return fmt.Errorf("while running migrations: %w", err)
 	}
 
-	log.Printf("PrepareDatabase: ingesting images from directory")
-	err = filepath.WalkDir(a.ImagesDir, func(fullPath string, info fs.DirEntry, err error) error {
+	log.Printf("PrepareDatabaseMigrations: migrations completed successfully")
+	return nil
+}
+
+// IngestImages scans the images directory and loads all images into the database.
+// This can be called asynchronously after the HTTP server starts.
+func (a *AnnotatorApp) IngestImages(ctx context.Context) error {
+	log.Printf("IngestImages: starting image ingestion from directory: %s", a.ImagesDir)
+
+	err := filepath.WalkDir(a.ImagesDir, func(fullPath string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -943,7 +967,7 @@ CREATE INDEX IF NOT EXISTS idx_annotations_stage ON annotations(stage_index);
 			return fmt.Errorf("while checking if item '%s' is a file: datasets must be organized in a flat folder structure. Hint: use the 'ingest' subcommand.", fullPath)
 		}
 
-		log.Printf("PrepareDatabase: ingesting image: %s", fullPath)
+		log.Printf("IngestImages: processing image: %s", fullPath)
 
 		// Verify it's an image
 		_, err = DecodeImage(fullPath)
@@ -969,9 +993,9 @@ CREATE INDEX IF NOT EXISTS idx_annotations_stage ON annotations(stage_index);
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("while ingesting images: %w", err)
 	}
 
-	log.Printf("PrepareDatabase: success! Database is ready")
+	log.Printf("IngestImages: completed successfully!")
 	return nil
 }

@@ -4,6 +4,7 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -118,7 +119,8 @@ With a set of trivial choices scale the classification of a set of images to man
 			Config:    config,
 		}
 
-		if err := app.PrepareDatabase(cmd.Context()); err != nil {
+		// Run database migrations synchronously before starting the server
+		if err := app.PrepareDatabaseMigrations(cmd.Context()); err != nil {
 			return fmt.Errorf("failed to prepare database: %w", err)
 		}
 
@@ -131,7 +133,16 @@ With a set of trivial choices scale the classification of a set of images to man
 		for _, task := range config.Tasks {
 			log.Printf("  - %s: %s", task.ID, task.Name)
 		}
-		log.Printf("Starting server on: %s", addr)
+
+		// Start image ingestion in background (non-blocking)
+		go func() {
+			if err := app.IngestImages(context.Background()); err != nil {
+				log.Printf("Error during background image ingestion: %v", err)
+			}
+		}()
+
+		log.Printf("Server is ready and listening on: %s", addr)
+		log.Printf("Images are being loaded in the background...")
 
 		return http.ListenAndServe(addr, app.GetHTTPHandler())
 	},
