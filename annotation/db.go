@@ -25,10 +25,8 @@ func GetDatabase(filename string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	// Configure connection pool for SQLite
-	// SQLite can only handle one writer at a time, so we limit to 1 open connection
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	// With WAL mode + busy_timeout, SQLite handles concurrency correctly
+	// No need to artificially limit connections - let database/sql use defaults
 
 	return db, nil
 }
