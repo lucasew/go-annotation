@@ -3,12 +3,13 @@ package annotation
 import (
 	"embed"
 	"fmt"
+	"html/template"
 	"io"
 	"maps"
 )
 
 var (
-	//go:embed templates/**/*
+	//go:embed templates/*
 	templateFS embed.FS
 
 	//go:embed assets/css/output.css
@@ -35,7 +36,7 @@ func RenderPage(w io.Writer, pageName string, data map[string]any) error {
 	if data == nil {
 		data = make(map[string]any)
 	}
-	data["CSS"] = cssContent
+	data["CSS"] = template.CSS(cssContent)
 
 	return templateManager.Render(w, "pages/"+pageName, data)
 }
