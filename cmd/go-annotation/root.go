@@ -47,6 +47,8 @@ With a set of trivial choices scale the classification of a set of images to man
 					if err := createSampleConfig(configFile, imagesDir); err != nil {
 						return fmt.Errorf("failed to create config: %w", err)
 					}
+					log.Printf("✓ Config file created. You can now run 'go-annotation %s' to start the server.", arg)
+					return nil // Exit after creating the config
 				}
 			} else {
 				// Assume it's a config file

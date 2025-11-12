@@ -281,21 +281,25 @@ func (q *Queries) GetAnnotationsForImage(ctx context.Context, imageID int64) ([]
 }
 
 const listPendingImagesForUserAndStage = `-- name: ListPendingImagesForUserAndStage :many
+WITH annotated_images AS (
+  SELECT image_id FROM annotations WHERE username = ? AND stage_index = ?
+)
 SELECT i.id, i.path, i.original_filename, i.ingested_at, i.completed_stages, i.is_finished
 FROM images i
-WHERE i.is_finished = FALSE
-  AND NOT EXISTS (
-    SELECT 1 FROM annotations a
-    WHERE a.image_id = i.id
-      AND a.username = @username
-      AND a.stage_index = @stage_index
-  )
+LEFT JOIN annotated_images ai ON i.id = ai.image_id
+WHERE i.is_finished = FALSE AND ai.image_id IS NULL
 ORDER BY i.completed_stages ASC, i.id ASC
-LIMIT ?1
+LIMIT ?
 `
 
-func (q *Queries) ListPendingImagesForUserAndStage(ctx context.Context, limit int64) ([]Image, error) {
-	rows, err := q.db.QueryContext(ctx, listPendingImagesForUserAndStage, limit)
+type ListPendingImagesForUserAndStageParams struct {
+	Username   string `json:"username"`
+	StageIndex int64  `json:"stage_index"`
+	Limit      int64  `json:"limit"`
+}
+
+func (q *Queries) ListPendingImagesForUserAndStage(ctx context.Context, arg ListPendingImagesForUserAndStageParams) ([]Image, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingImagesForUserAndStage, arg.Username, arg.StageIndex, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

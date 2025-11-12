@@ -130,16 +130,20 @@ func (r *ImageRepository) Delete(ctx context.Context, id int64) error {
 // toDomainImage converts a sqlc.Image to domain.Image
 func toDomainImage(img sqlc.Image) *domain.Image {
 	d := &domain.Image{
-		ID:              img.ID,
-		Path:            img.Path,
-		CompletedStages: int(img.CompletedStages),
-		IsFinished:      img.IsFinished,
+		ID:   img.ID,
+		Path: img.Path,
 	}
 	if img.OriginalFilename != nil {
 		d.OriginalFilename = *img.OriginalFilename
 	}
 	if img.IngestedAt != nil {
 		d.IngestedAt = *img.IngestedAt
+	}
+	if img.CompletedStages != nil {
+		d.CompletedStages = int(*img.CompletedStages)
+	}
+	if img.IsFinished != nil {
+		d.IsFinished = *img.IsFinished
 	}
 	return d
 }

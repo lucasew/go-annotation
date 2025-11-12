@@ -27,7 +27,7 @@ type Querier interface {
 	GetImageByPath(ctx context.Context, path string) (Image, error)
 	ListImages(ctx context.Context) ([]Image, error)
 	ListImagesNotFinished(ctx context.Context, limit int64) ([]Image, error)
-	ListPendingImagesForUserAndStage(ctx context.Context, limit int64) ([]Image, error)
+	ListPendingImagesForUserAndStage(ctx context.Context, arg ListPendingImagesForUserAndStageParams) ([]Image, error)
 	UpdateImageCompletionStatus(ctx context.Context, arg UpdateImageCompletionStatusParams) error
 }
 

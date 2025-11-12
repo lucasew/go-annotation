@@ -34,17 +34,15 @@ SELECT COUNT(*) FROM annotations
 WHERE username = ?;
 
 -- name: ListPendingImagesForUserAndStage :many
+WITH annotated_images AS (
+  SELECT image_id FROM annotations WHERE username = ? AND stage_index = ?
+)
 SELECT i.*
 FROM images i
-WHERE i.is_finished = FALSE
-  AND NOT EXISTS (
-    SELECT 1 FROM annotations a
-    WHERE a.image_id = i.id
-      AND a.username = @username
-      AND a.stage_index = @stage_index
-  )
+LEFT JOIN annotated_images ai ON i.id = ai.image_id
+WHERE i.is_finished = FALSE AND ai.image_id IS NULL
 ORDER BY i.completed_stages ASC, i.id ASC
-LIMIT @limit;
+LIMIT ?;
 
 -- name: CheckAnnotationExists :one
 SELECT EXISTS (

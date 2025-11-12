@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/lucasew/go-annotation/internal/domain"
 	"github.com/lucasew/go-annotation/internal/sqlc"
