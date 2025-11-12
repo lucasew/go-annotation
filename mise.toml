@@ -10,7 +10,57 @@ depends = ["gen:*"]
 description = "Generate CSS from Tailwind"
 run = "npm run build:css"
 
+[tasks."gen:sqlc"]
+description = "Generate Go code from SQL queries using sqlc"
+run = "sqlc generate"
+
 [tasks.ci]
 description = "Run CI checks (gen + build)"
 depends = ["gen"]
 run = "go build -v ./cmd/go-annotation"
+
+[tasks."install-tools"]
+description = "Install required development tools (sqlc, dbmate)"
+run = """
+echo "Installing sqlc..."
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+echo "Installing dbmate..."
+go install github.com/amacneil/dbmate/v2@latest
+echo "✓ Tools installed"
+"""
+
+[tasks.test]
+description = "Run all tests with coverage"
+run = """
+go test -v -race -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+echo "✓ Coverage report generated: coverage.html"
+"""
+
+[tasks."test-short"]
+description = "Run short tests (no integration tests)"
+run = "go test -short -v ./..."
+
+[tasks.build]
+description = "Build the binary"
+run = "go build -v -o go-annotation ./cmd/go-annotation"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = """
+rm -f go-annotation coverage.out coverage.html
+echo "✓ Cleaned"
+"""
+
+[tasks."migrate-up"]
+description = "Run database migrations"
+run = "dbmate up"
+
+[tasks."migrate-down"]
+description = "Rollback last migration"
+run = "dbmate down"
+
+[tasks."migrate-status"]
+description = "Show migration status"
+run = "dbmate status"
+
