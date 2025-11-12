@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"io/fs"
 	"log"
@@ -19,7 +18,6 @@ import (
 	"math/rand"
 
 	"github.com/lucasew/go-annotation/internal/repository"
-	"github.com/russross/blackfriday"
 )
 
 type AnnotatorApp struct {
@@ -599,14 +597,10 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	// Help pages
 	mux.HandleFunc("/help/", func(w http.ResponseWriter, r *http.Request) {
 		itemPath := pathParts(r.URL.Path)
-		var markdownBuilder strings.Builder
 		title := "Help"
 
-		fmt.Fprintf(&markdownBuilder, "# %s\n", i("Project help"))
-		fmt.Fprintf(&markdownBuilder, "## %s\n", i("Description"))
-		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, i("(No description provided)")), "\n", "\n>"))
-
 		var tasks []TaskWithCount = nil
+		var currentTask *ConfigTask = nil
 
 		if len(itemPath) == 1 {
 			// Only populate tasks for the timeline view (no markdown for tasks)
@@ -652,22 +646,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 				http.NotFoundHandler().ServeHTTP(w, r)
 				return
 			}
-			fmt.Fprintf(&markdownBuilder, "## %s: %s\n", i("Phase"), task.ShortName)
-			fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, "(No description provided)"), "\n", "\n>"))
-
-			fmt.Fprintf(&markdownBuilder, "### %s\n", i("Possible choices"))
-			for k, v := range task.Classes {
-				fmt.Fprintf(&markdownBuilder, "#### %s (%s)\n", i(stringOr(v.Name, "(No name)")), k)
-
-				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(v.Description, i("(No description provided)")), "\n", "\n>"))
-				if v.Examples != nil && len(v.Examples) > 0 {
-
-					fmt.Fprintf(&markdownBuilder, "##### %s \n", i("Examples"))
-					for _, example := range v.Examples {
-						fmt.Fprintf(&markdownBuilder, "\n\n![](/asset/%s)", example)
-					}
-				}
-			}
+			currentTask = task
 
 			// Get progress stats for this specific task
 			phaseProgress, err := a.GetPhaseProgressStats(r.Context(), helpTask)
@@ -697,12 +676,10 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			return
 		}
 
-		// Convert markdown to HTML
-		htmlContent := blackfriday.MarkdownCommon([]byte(markdownBuilder.String()))
-
 		data := map[string]interface{}{
 			"Title":       title,
-			"HTMLContent": template.HTML(htmlContent),
+			"Description": a.Config.Meta.Description,
+			"Task":        currentTask,
 			"Tasks":       tasks,
 		}
 

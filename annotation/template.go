@@ -5,6 +5,8 @@ import (
 	"html/template"
 	"io"
 	"maps"
+
+	"github.com/russross/blackfriday/v2"
 )
 
 var (
@@ -21,6 +23,11 @@ var (
 	TemplateFuncMap = template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
+		"i": i, // Internationalization function
+		"markdown": func(text string) template.HTML {
+			// Convert markdown to HTML using blackfriday v2
+			return template.HTML(blackfriday.Run([]byte(text)))
+		},
 	}
 )
 
