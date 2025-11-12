@@ -2,8 +2,9 @@ package annotation
 
 import (
 	"embed"
-	"html/template"
+	"fmt"
 	"io"
+	"maps"
 )
 
 var (
@@ -25,31 +26,30 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Printf("css: %s", cssContent)
 }
 
 // RenderPage renders a page using mold with automatic CSS injection
-func RenderPage(w io.Writer, pageName string, data map[string]interface{}) error {
+func RenderPage(w io.Writer, pageName string, data map[string]any) error {
 	// Inject CSS automatically
 	if data == nil {
 		data = make(map[string]any)
 	}
-	data["CSS"] = template.CSS(cssContent)
+	data["CSS"] = cssContent
 
 	return templateManager.Render(w, "pages/"+pageName, data)
 }
 
 // RenderPageWithTitle is a convenience function to render a page with just a title
-func RenderPageWithTitle(w io.Writer, pageName, title string, data interface{}) error {
-	dataMap := make(map[string]interface{})
+func RenderPageWithTitle(w io.Writer, pageName, title string, data any) error {
+	dataMap := make(map[string]any)
 
 	// Set title
 	dataMap["Title"] = title
 
 	// If data is already a map, merge it
-	if m, ok := data.(map[string]interface{}); ok {
-		for k, v := range m {
-			dataMap[k] = v
-		}
+	if m, ok := data.(map[string]any); ok {
+		maps.Copy(dataMap, m)
 	} else if data != nil {
 		dataMap["Data"] = data
 	}

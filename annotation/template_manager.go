@@ -27,9 +27,9 @@ type BlockData struct {
 // NewTemplateManager creates a new template manager using mold
 // The fs should be an embed.FS containing your templates
 func NewTemplateManager(templateFS embed.FS, options ...mold.Option) (*TemplateManager, error) {
-	// Use WithRoot to specify the templates subdirectory
-	opts := append([]mold.Option{mold.WithRoot("templates")}, options...)
-
+	opts := options
+	opts = append(opts, mold.WithRoot("templates"))
+	opts = append(opts, mold.WithLayout("layout.html"))
 	engine, err := mold.New(templateFS, opts...)
 	if err != nil {
 		return nil, err
