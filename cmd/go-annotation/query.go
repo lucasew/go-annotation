@@ -44,16 +44,24 @@ func PrintQuery(ctx context.Context, db *sql.Tx, query string, args ...interface
 
 // queryCmd represents the query command
 var queryCmd = &cobra.Command{
-	Use:   "query [flags] database step [value] [item]",
-	Short: "Queries the annotation database",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Use:   "query [flags] database [stage_index] [option_value] [image_path]",
+	Short: "Queries the annotation database (new schema)",
+	Long: `Query annotations from the database using the new unified schema.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Examples:
+  # List all distinct stage indexes (phases)
+  go-annotation query annotations.db
+
+  # List all distinct option values for stage 0
+  go-annotation query annotations.db 0
+
+  # List images annotated with value "landscape" for stage 0
+  go-annotation query annotations.db 0 landscape
+
+  # Query specific image
+  go-annotation query annotations.db 0 landscape image.jpg`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fetchHash, err := cmd.Flags().GetBool("show-hashes")
+		showIDs, err := cmd.Flags().GetBool("show-ids")
 		if err != nil {
 			return err
 		}
@@ -65,7 +73,6 @@ to quickly create a Cobra application.`,
 			return err
 		}
 		defer db.Close()
-		// spew.Dump(db)
 
 		tx, err := db.BeginTx(cmd.Context(), &sql.TxOptions{
 			Isolation: sql.LevelReadUncommitted,
@@ -77,28 +84,36 @@ to quickly create a Cobra application.`,
 
 		queryArgs := []interface{}{}
 		query := ""
+
+		// No stage index provided - list all stages
 		if len(args) < 2 {
-			return PrintQuery(cmd.Context(), tx, "select distinct substr(tbl_name, 6) from SQLITE_MASTER where tbl_name like 'task_%'")
-		}
-		if len(args) < 3 {
-			return PrintQuery(cmd.Context(), tx, fmt.Sprintf("select distinct value from task_%s where sure = 1", args[1]))
+			return PrintQuery(cmd.Context(), tx, "SELECT DISTINCT stage_index FROM annotations ORDER BY stage_index")
 		}
 
-		if fetchHash {
-			query += "select image "
-		} else {
-			query += "select images.filename "
+		// Stage index provided, no option value - list all option values for stage
+		if len(args) < 3 {
+			return PrintQuery(cmd.Context(), tx, "SELECT DISTINCT option_value FROM annotations WHERE stage_index = ?", args[1])
 		}
-		query += fmt.Sprintf(" from task_%s ", args[1])
-		query += "join images on image = sha256 "
-		query += "where sure = 1 "
+
+		// Build query to find images with specific annotations
+		if showIDs {
+			query += "SELECT images.id "
+		} else {
+			query += "SELECT images.path "
+		}
+		query += "FROM annotations "
+		query += "JOIN images ON annotations.image_id = images.id "
+		query += "WHERE annotations.stage_index = ? "
+		queryArgs = append(queryArgs, args[1])
+
 		if len(args) >= 3 {
-			query += " and value = ?"
+			query += "AND annotations.option_value = ? "
 			queryArgs = append(queryArgs, args[2])
 		}
+
 		if len(args) >= 4 {
-			query += " and (image = ? or images.filename = ?)"
-			queryArgs = append(queryArgs, args[3], args[3])
+			query += "AND (CAST(images.id AS TEXT) = ? OR images.path = ? OR images.original_filename = ?) "
+			queryArgs = append(queryArgs, args[3], args[3], args[3])
 		}
 
 		return PrintQuery(cmd.Context(), tx, query, queryArgs...)
@@ -108,7 +123,7 @@ to quickly create a Cobra application.`,
 func init() {
 	rootCmd.AddCommand(queryCmd)
 
-	queryCmd.Flags().BoolP("show-hashes", "i", false, "Show hash of file instead of file name")
+	queryCmd.Flags().BoolP("show-ids", "i", false, "Show image IDs instead of paths")
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// annotatorCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")

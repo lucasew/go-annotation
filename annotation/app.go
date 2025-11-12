@@ -18,15 +18,18 @@ import (
 
 	"math/rand"
 
+	"github.com/lucasew/go-annotation/internal/repository"
 	"github.com/russross/blackfriday"
 )
 
 type AnnotatorApp struct {
-	ImagesDir     string
-	Database      *sql.DB
-	Config        *Config
-	OffsetAdvance int
-	i18n          map[string]string
+	ImagesDir          string
+	Database           *sql.DB
+	Config             *Config
+	OffsetAdvance      int
+	i18n               map[string]string
+	imageRepo          *repository.ImageRepository
+	annotationRepo     *repository.AnnotationRepository
 }
 
 func (a *AnnotatorApp) init() {
@@ -36,6 +39,9 @@ func (a *AnnotatorApp) init() {
 	if a.OffsetAdvance == 0 {
 		a.OffsetAdvance = 10
 	}
+	// Initialize repositories
+	a.imageRepo = repository.NewImageRepository(a.Database)
+	a.annotationRepo = repository.NewAnnotationRepository(a.Database)
 }
 
 func stringOr(str, or string) string {
@@ -69,26 +75,92 @@ type TaskWithCount struct {
 }
 
 func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) (int, error) {
-	task := a.GetTask(taskID)
-	if task == nil {
+	// Find stage index for this task
+	stageIndex := -1
+	for i, task := range a.Config.Tasks {
+		if task.ID == taskID {
+			stageIndex = i
+			break
+		}
+	}
+	if stageIndex == -1 {
 		return 0, fmt.Errorf("task not found: %s", taskID)
 	}
 
-	filters := ""
-	for criteriaTask, criteriaValue := range task.If {
-		filters = fmt.Sprintf("and (image in (select image from task_%s where value = '%s' and sure = 1 ))", criteriaTask, criteriaValue)
-	}
+	task := a.Config.Tasks[stageIndex]
 
-	var count int
-	err := a.Database.QueryRowContext(ctx, fmt.Sprintf("select count(*) from task_%s where value is NULL %s", task.ID, filters)).Scan(&count)
+	// Count images without annotation for this stage
+	count, err := a.annotationRepo.CountImagesWithoutAnnotationForStage(ctx, int64(stageIndex))
 	if err != nil {
 		return 0, fmt.Errorf("while counting available images: %w", err)
 	}
 
-	return count, nil
+	// Handle task dependencies (If field)
+	// If there are dependencies, we need to filter images that meet the criteria
+	if len(task.If) > 0 {
+		// Get all candidate images
+		allImages, err := a.imageRepo.ListNotFinished(ctx, 10000) // Large limit
+		if err != nil {
+			return 0, fmt.Errorf("while listing images: %w", err)
+		}
+
+		validCount := 0
+		for _, img := range allImages {
+			valid := true
+			// Check each dependency
+			for depTaskID, requiredValue := range task.If {
+				// Find the stage index for the dependency task
+				depStageIndex := -1
+				for i, t := range a.Config.Tasks {
+					if t.ID == depTaskID {
+						depStageIndex = i
+						break
+					}
+				}
+				if depStageIndex == -1 {
+					continue
+				}
+
+				// Check if this image has the required annotation value for the dependency
+				hasValidAnnotation := false
+				// We need to check if ANY user has annotated this image with the required value
+				// For simplicity, we'll use GetImageIDsWithAnnotation
+				imageIDs, err := a.annotationRepo.GetImageIDsWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+				if err != nil {
+					return 0, fmt.Errorf("while checking dependency: %w", err)
+				}
+				for _, id := range imageIDs {
+					if id == img.ID {
+						hasValidAnnotation = true
+						break
+					}
+				}
+
+				if !hasValidAnnotation {
+					valid = false
+					break
+				}
+			}
+
+			if valid {
+				// Check if this image has annotation for current stage
+				hasAnnotation, err := a.annotationRepo.CheckAnnotationExists(ctx, img.ID, "", int64(stageIndex))
+				if err != nil {
+					return 0, err
+				}
+				if !hasAnnotation {
+					validCount++
+				}
+			}
+		}
+		return validCount, nil
+	}
+
+	return int(count), nil
 }
 
 func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*AnnotationStep, error) {
+	// If no task specified, try each task in order
 	if taskID == "" {
 		for _, task := range a.Config.Tasks {
 			step, err := a.NextAnnotationStep(ctx, task.ID)
@@ -102,66 +174,124 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		}
 		return nil, nil
 	}
-	task := a.GetTask(taskID)
-	filters := ""
-	for criteriaTask, criteriaValue := range task.If {
-		filters = fmt.Sprintf("and (image in (select image from task_%s where value = '%s' and sure = 1 ))", criteriaTask, criteriaValue)
-	}
 
-	ret := AnnotationStep{TaskID: taskID}
-	rows, err := a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where value is NULL %s", task.ID, filters))
-	if err != nil {
-		return nil, fmt.Errorf("while fetching pending tasks: %w", err)
-	}
-	defer rows.Close()
-	imageIDs := []string{}
-	for i := 0; i < a.OffsetAdvance; i++ {
-		if !rows.Next() {
+	// Find stage index for this task
+	stageIndex := -1
+	for i, task := range a.Config.Tasks {
+		if task.ID == taskID {
+			stageIndex = i
 			break
 		}
-		var imageID string
-		err = rows.Scan(&imageID)
+	}
+	if stageIndex == -1 {
+		return nil, fmt.Errorf("task not found: %s", taskID)
+	}
+
+	task := a.Config.Tasks[stageIndex]
+
+	// Get images without annotation for this stage (using a large limit)
+	allImages, err := a.imageRepo.ListNotFinished(ctx, 10000)
+	if err != nil {
+		return nil, fmt.Errorf("while listing images: %w", err)
+	}
+
+	// Filter images based on dependencies and annotation status
+	var candidateImages []int64
+	for _, img := range allImages {
+		// Check if image already has annotation for this stage
+		hasAnnotation, err := a.annotationRepo.CheckAnnotationExists(ctx, img.ID, "", int64(stageIndex))
 		if err != nil {
 			return nil, err
 		}
-		imageIDs = append(imageIDs, imageID)
-	}
-	if len(imageIDs) == 0 {
-		rows, err = a.Database.QueryContext(ctx, fmt.Sprintf("select image from task_%s where sure != 1 %s", task.ID, filters))
-		if err != nil {
-			return nil, fmt.Errorf("while fetching doubtful tasks: %w", err)
+		if hasAnnotation {
+			continue // Skip images that already have annotation
 		}
-		defer rows.Close()
-		for i := 0; i < a.OffsetAdvance; i++ {
-			if !rows.Next() {
+
+		// Check task dependencies (If field)
+		valid := true
+		if len(task.If) > 0 {
+			for depTaskID, requiredValue := range task.If {
+				// Find the stage index for the dependency task
+				depStageIndex := -1
+				for i, t := range a.Config.Tasks {
+					if t.ID == depTaskID {
+						depStageIndex = i
+						break
+					}
+				}
+				if depStageIndex == -1 {
+					continue
+				}
+
+				// Check if this image has the required annotation value for the dependency
+				imageIDs, err := a.annotationRepo.GetImageIDsWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+				if err != nil {
+					return nil, fmt.Errorf("while checking dependency: %w", err)
+				}
+
+				hasValidAnnotation := false
+				for _, id := range imageIDs {
+					if id == img.ID {
+						hasValidAnnotation = true
+						break
+					}
+				}
+
+				if !hasValidAnnotation {
+					valid = false
+					break
+				}
+			}
+		}
+
+		if valid {
+			candidateImages = append(candidateImages, img.ID)
+			// Limit candidates to OffsetAdvance for performance
+			if len(candidateImages) >= a.OffsetAdvance {
 				break
 			}
-			var imageID string
-			err = rows.Scan(&imageID)
-			if err != nil {
-				return nil, err
-			}
-			imageIDs = append(imageIDs, imageID)
 		}
 	}
-	if len(imageIDs) > 0 {
-		ret.ImageID = imageIDs[rand.Intn(len(imageIDs))]
-		return &ret, nil
+
+	// No images available
+	if len(candidateImages) == 0 {
+		return nil, nil
 	}
-	return nil, nil
+
+	// Randomly select one image
+	selectedImageID := candidateImages[rand.Intn(len(candidateImages))]
+
+	// Get image details
+	selectedImage, err := a.imageRepo.Get(ctx, selectedImageID)
+	if err != nil {
+		return nil, fmt.Errorf("while getting image details: %w", err)
+	}
+
+	return &AnnotationStep{
+		TaskID:    taskID,
+		ImageID:   fmt.Sprintf("%d", selectedImageID),
+		ImageName: selectedImage.Path,
+	}, nil
 }
 
-func (a *AnnotatorApp) GetFilenameFromHash(ctx context.Context, hash string) (filename string, err error) {
-	rows, err := a.Database.QueryContext(ctx, "select filename from images where sha256 = ?", hash)
+func (a *AnnotatorApp) GetImagePath(ctx context.Context, imageID string) (imagePath string, err error) {
+	// Convert image ID from string to int64
+	var id int64
+	_, err = fmt.Sscanf(imageID, "%d", &id)
 	if err != nil {
+		return "", fmt.Errorf("invalid image ID: %w", err)
+	}
+
+	// Get image from repository
+	img, err := a.imageRepo.Get(ctx, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", fmt.Errorf("image not found: %s", imageID)
+		}
 		return "", err
 	}
-	defer rows.Close()
-	if !rows.Next() {
-		return "", fmt.Errorf("No filename found for hash")
-	}
-	err = rows.Scan(&filename)
-	return
+
+	return img.Path, nil
 }
 
 type AnnotationResponse struct {
@@ -173,26 +303,31 @@ type AnnotationResponse struct {
 }
 
 func (a *AnnotatorApp) SubmitAnnotation(ctx context.Context, annotation AnnotationResponse) error {
-	tx, err := a.Database.BeginTx(ctx, &sql.TxOptions{})
+	// Find stage index for this task
+	stageIndex := -1
+	for i, task := range a.Config.Tasks {
+		if task.ID == annotation.TaskID {
+			stageIndex = i
+			break
+		}
+	}
+	if stageIndex == -1 {
+		return fmt.Errorf("no such task: %s", annotation.TaskID)
+	}
+
+	// Convert image ID from string to int64
+	var imageID int64
+	_, err := fmt.Sscanf(annotation.ImageID, "%d", &imageID)
 	if err != nil {
-		return fmt.Errorf("while starting transaction: %w", err)
+		return fmt.Errorf("invalid image ID: %w", err)
 	}
-	defer tx.Rollback()
-	task := a.GetTask(annotation.TaskID)
-	if task == nil {
-		return fmt.Errorf("no such task") // did you check for the task before calling this?
-	}
-	_, err = tx.Exec(
-		fmt.Sprintf("update task_%s set user = ?, value = ?, sure = ? where image == ?", task.ID),
-		annotation.User, annotation.Value, annotation.Sure, annotation.ImageID,
-	)
+
+	// Create or update annotation using repository
+	_, err = a.annotationRepo.Create(ctx, imageID, annotation.User, stageIndex, annotation.Value)
 	if err != nil {
-		return fmt.Errorf("while updating value of the annotation: %w", err)
+		return fmt.Errorf("while creating annotation: %w", err)
 	}
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("while commiting transaction: %w", err)
-	}
+
 	return nil
 }
 
@@ -341,7 +476,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
-		filename, _ := a.GetFilenameFromHash(r.Context(), imageID)
+		imagePath, _ := a.GetImagePath(r.Context(), imageID)
 
 		if r.Method == http.MethodPost {
 			log.Printf("POST")
@@ -420,7 +555,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			"TaskID":        taskID,
 			"TaskName":      task.Name,
 			"ImageID":       imageID,
-			"ImageFilename": filename,
+			"ImageFilename": imagePath,
 			"Classes":       classes,
 		}
 
@@ -438,25 +573,20 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
-		image_id := itemPath[1]
-		log.Printf("http: fetching asset id %s", image_id)
+		imageID := itemPath[1]
+		log.Printf("http: fetching asset id %s", imageID)
 
-		rows, err := a.Database.QueryContext(r.Context(), "select filename from images where sha256 = ? limit 1", image_id)
+		// Get image path from repository
+		imagePath, err := a.GetImagePath(r.Context(), imageID)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			log.Printf("error: while querying for the filename of hash %s: %s", image_id, err)
-			return
-		}
-		if !rows.Next() {
-			log.Printf("http: asset id %s was not found in the database", image_id)
+			log.Printf("http: asset id %s was not found: %s", imageID, err)
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
-		var filename string
-		rows.Scan(&filename)
-		log.Printf("http: asset id %s is %s!", image_id, filename)
-		f, err := os.Open(path.Join(a.ImagesDir, filename))
-		defer f.Close()
+
+		log.Printf("http: asset id %s is %s!", imageID, imagePath)
+		fullPath := path.Join(a.ImagesDir, imagePath)
+		f, err := os.Open(fullPath)
 		if errors.Is(err, os.ErrNotExist) {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
@@ -466,6 +596,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			log.Printf("error: http: while serving image asset: %s", err)
 			return
 		}
+		defer f.Close()
 		io.Copy(w, f)
 	})
 
@@ -503,82 +634,90 @@ func (a *AnnotatorApp) authenticationMiddleware(handler http.Handler) http.Handl
 
 func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
 	a.init()
-	log.Printf("PrepareDatabase: starting transaction")
-	tx, err := a.Database.BeginTx(ctx, &sql.TxOptions{})
+
+	log.Printf("PrepareDatabase: running database migrations")
+	// Run the migration SQL to create the new schema
+	migrationSQL := `
+-- Images table stores information about images to be annotated
+CREATE TABLE IF NOT EXISTS images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  path TEXT UNIQUE NOT NULL,
+  original_filename TEXT,
+  ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_stages INTEGER DEFAULT 0,
+  is_finished BOOLEAN DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_images_is_finished ON images(is_finished);
+CREATE INDEX IF NOT EXISTS idx_images_completed_stages ON images(completed_stages);
+
+-- Annotations table stores all annotations
+CREATE TABLE IF NOT EXISTS annotations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  image_id INTEGER NOT NULL,
+  username TEXT NOT NULL,
+  stage_index INTEGER NOT NULL,
+  option_value TEXT NOT NULL,
+  annotated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(image_id, username, stage_index),
+  FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_annotations_image_id ON annotations(image_id);
+CREATE INDEX IF NOT EXISTS idx_annotations_username ON annotations(username);
+CREATE INDEX IF NOT EXISTS idx_annotations_stage ON annotations(stage_index);
+	`
+
+	_, err := a.Database.ExecContext(ctx, migrationSQL)
 	if err != nil {
-		return fmt.Errorf("while starting database setup transaction: %w", err)
+		return fmt.Errorf("while running migrations: %w", err)
 	}
-	defer tx.Rollback()
-	log.Printf("PrepareDatabase: setting up images table")
-	_, err = tx.Exec(`
-create table if not exists images (
-    sha256 text unique primary key,
-    filename text not null
-)
-    `)
-	if err != nil {
-		return fmt.Errorf("while creating table 'images': %w", err)
-	}
-	log.Printf("PrepareDatabase: populating images table")
-	err = filepath.WalkDir(a.ImagesDir, func(path string, info fs.DirEntry, err error) error {
+
+	log.Printf("PrepareDatabase: ingesting images from directory")
+	err = filepath.WalkDir(a.ImagesDir, func(fullPath string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if path == a.ImagesDir {
+		if fullPath == a.ImagesDir {
 			return nil
 		}
 		if info.IsDir() {
-			return fmt.Errorf("while checking if item '%s' is a file: datasets must be organized in a flat folder structure. Hint: use the 'ingest' subcommand.", path)
+			return fmt.Errorf("while checking if item '%s' is a file: datasets must be organized in a flat folder structure. Hint: use the 'ingest' subcommand.", fullPath)
 		}
-		log.Printf("PrepareDatabase: populating images table: %s", path)
-		_, err = DecodeImage(path)
+
+		log.Printf("PrepareDatabase: ingesting image: %s", fullPath)
+
+		// Verify it's an image
+		_, err = DecodeImage(fullPath)
 		if err != nil {
-			return fmt.Errorf("while checking if item '%s' is an image: %w", path, err)
+			return fmt.Errorf("while checking if item '%s' is an image: %w", fullPath, err)
 		}
-		fileHash, err := HashFile(path)
+
+		// Get relative path from images directory
+		relPath, err := filepath.Rel(a.ImagesDir, fullPath)
 		if err != nil {
-			return fmt.Errorf("while hashing item '%s': %w", path, err)
+			relPath = fullPath
 		}
-		_, err = tx.Exec(`
-insert into images (filename, sha256) values (?, ?) on conflict(sha256) do update set filename=excluded.filename
-        `, info.Name(), fileHash)
-		return err
+
+		// Use repository to create image (with upsert behavior)
+		_, err = a.imageRepo.GetByPath(ctx, relPath)
+		if err == sql.ErrNoRows || err != nil {
+			// Image doesn't exist, create it
+			_, err = a.imageRepo.Create(ctx, relPath, info.Name())
+			if err != nil {
+				// Ignore duplicate errors (path already exists)
+				if !strings.Contains(err.Error(), "UNIQUE constraint") {
+					return fmt.Errorf("while inserting image '%s': %w", fullPath, err)
+				}
+			}
+		}
+
+		return nil
 	})
 	if err != nil {
 		return err
 	}
-	log.Printf("PrepareDatabase: create index for hashes to image paths") // TODO: check later if it's actually premature optimization
-	_, err = tx.Exec(`
-        create unique index if not exists images_hash_idx on images(sha256)
-    `)
-	if err != nil {
-		return fmt.Errorf("while creating index for image hashes: %w", err)
-	}
 
-	log.Printf("PrepareDatabase: creating tables for each task")
-	for _, task := range a.Config.Tasks {
-		_, err := tx.Exec(fmt.Sprintf(`
-create table if not exists task_%s (
-    image text not null unique,
-    user text,
-    value text,
-    sure int, -- 0 = not sure, 1 = sure
-    foreign key(image) references images(sha256)
-);
-
-`, task.ID))
-		if err != nil {
-			return fmt.Errorf("while creating task database for task '%s': %w", task.ID, err)
-		}
-		_, err = tx.Exec(fmt.Sprintf(`
-insert or ignore into task_%s (image) select sha256 image from images
-`, task.ID))
-
-		if err != nil {
-			return fmt.Errorf("while seeding task database for task '%s': %w", task.ID, err)
-		}
-	}
-
-	log.Printf("PrepareDatabase: success! commiting transaction to the database")
-	return tx.Commit()
+	log.Printf("PrepareDatabase: success! Database is ready")
+	return nil
 }

@@ -43,6 +43,45 @@ func (q *Queries) CountAnnotationsByUser(ctx context.Context, username string) (
 	return count, err
 }
 
+const countImagesWithoutAnnotationForStage = `-- name: CountImagesWithoutAnnotationForStage :one
+WITH annotated_images AS (
+  SELECT DISTINCT image_id FROM annotations WHERE stage_index = ?
+)
+SELECT COUNT(*)
+FROM images i
+LEFT JOIN annotated_images ai ON i.id = ai.image_id
+WHERE i.is_finished = FALSE AND ai.image_id IS NULL
+`
+
+func (q *Queries) CountImagesWithoutAnnotationForStage(ctx context.Context, stageIndex int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countImagesWithoutAnnotationForStage, stageIndex)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPendingImagesForUserAndStage = `-- name: CountPendingImagesForUserAndStage :one
+WITH annotated_images AS (
+  SELECT image_id FROM annotations WHERE username = ? AND stage_index = ?
+)
+SELECT COUNT(*)
+FROM images i
+LEFT JOIN annotated_images ai ON i.id = ai.image_id
+WHERE i.is_finished = FALSE AND ai.image_id IS NULL
+`
+
+type CountPendingImagesForUserAndStageParams struct {
+	Username   string `json:"username"`
+	StageIndex int64  `json:"stage_index"`
+}
+
+func (q *Queries) CountPendingImagesForUserAndStage(ctx context.Context, arg CountPendingImagesForUserAndStageParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPendingImagesForUserAndStage, arg.Username, arg.StageIndex)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAnnotation = `-- name: CreateAnnotation :one
 INSERT INTO annotations (image_id, username, stage_index, option_value)
 VALUES (?, ?, ?, ?)
@@ -270,6 +309,40 @@ func (q *Queries) GetAnnotationsForImage(ctx context.Context, imageID int64) ([]
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImageIDsWithAnnotation = `-- name: GetImageIDsWithAnnotation :many
+SELECT DISTINCT image_id
+FROM annotations
+WHERE stage_index = ? AND option_value = ?
+`
+
+type GetImageIDsWithAnnotationParams struct {
+	StageIndex  int64  `json:"stage_index"`
+	OptionValue string `json:"option_value"`
+}
+
+func (q *Queries) GetImageIDsWithAnnotation(ctx context.Context, arg GetImageIDsWithAnnotationParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, getImageIDsWithAnnotation, arg.StageIndex, arg.OptionValue)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var image_id int64
+		if err := rows.Scan(&image_id); err != nil {
+			return nil, err
+		}
+		items = append(items, image_id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

@@ -12,7 +12,9 @@ type Querier interface {
 	CheckAnnotationExists(ctx context.Context, arg CheckAnnotationExistsParams) (int64, error)
 	CountAnnotationsByUser(ctx context.Context, username string) (int64, error)
 	CountImages(ctx context.Context) (int64, error)
+	CountImagesWithoutAnnotationForStage(ctx context.Context, stageIndex int64) (int64, error)
 	CountPendingImages(ctx context.Context) (int64, error)
+	CountPendingImagesForUserAndStage(ctx context.Context, arg CountPendingImagesForUserAndStageParams) (int64, error)
 	CreateAnnotation(ctx context.Context, arg CreateAnnotationParams) (Annotation, error)
 	CreateImage(ctx context.Context, arg CreateImageParams) (Image, error)
 	DeleteAnnotation(ctx context.Context, id int64) error
@@ -25,6 +27,7 @@ type Querier interface {
 	GetAnnotationsForImage(ctx context.Context, imageID int64) ([]Annotation, error)
 	GetImage(ctx context.Context, id int64) (Image, error)
 	GetImageByPath(ctx context.Context, path string) (Image, error)
+	GetImageIDsWithAnnotation(ctx context.Context, arg GetImageIDsWithAnnotationParams) ([]int64, error)
 	ListImages(ctx context.Context) ([]Image, error)
 	ListImagesNotFinished(ctx context.Context, limit int64) ([]Image, error)
 	ListPendingImagesForUserAndStage(ctx context.Context, arg ListPendingImagesForUserAndStageParams) ([]Image, error)

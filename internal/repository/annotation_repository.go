@@ -216,5 +216,47 @@ func toDomainAnnotation(ann sqlc.Annotation) *domain.Annotation {
 	return d
 }
 
+// CountImagesWithoutAnnotationForStage counts images without any annotation for a stage
+func (r *AnnotationRepository) CountImagesWithoutAnnotationForStage(ctx context.Context, stageIndex int64) (int64, error) {
+	return r.queries.CountImagesWithoutAnnotationForStage(ctx, stageIndex)
+}
+
+// GetImageIDsWithAnnotation returns image IDs that have a specific annotation value for a stage
+func (r *AnnotationRepository) GetImageIDsWithAnnotation(ctx context.Context, stageIndex int64, optionValue string) ([]int64, error) {
+	params := sqlc.GetImageIDsWithAnnotationParams{
+		StageIndex:  stageIndex,
+		OptionValue: optionValue,
+	}
+	return r.queries.GetImageIDsWithAnnotation(ctx, params)
+}
+
+// CountPendingImagesForUserAndStage counts images needing annotation by a user for a specific stage
+func (r *AnnotationRepository) CountPendingImagesForUserAndStage(ctx context.Context, username string, stageIndex int64) (int64, error) {
+	params := sqlc.CountPendingImagesForUserAndStageParams{
+		Username:   username,
+		StageIndex: stageIndex,
+	}
+	return r.queries.CountPendingImagesForUserAndStage(ctx, params)
+}
+
+// CheckAnnotationExists checks if any annotation exists for an image at a stage (any user)
+func (r *AnnotationRepository) CheckAnnotationExists(ctx context.Context, imageID int64, username string, stageIndex int64) (bool, error) {
+	// If username is empty, check if any annotation exists for this image+stage
+	if username == "" {
+		anns, err := r.queries.GetAnnotationsForImage(ctx, imageID)
+		if err != nil {
+			return false, err
+		}
+		for _, ann := range anns {
+			if ann.StageIndex == stageIndex {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	// Otherwise use the specific user check
+	return r.Exists(ctx, imageID, username, int(stageIndex))
+}
+
 // Verify that AnnotationRepository implements domain.AnnotationRepository
 var _ domain.AnnotationRepository = (*AnnotationRepository)(nil)

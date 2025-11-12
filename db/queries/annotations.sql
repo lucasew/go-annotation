@@ -65,3 +65,26 @@ SELECT
   COUNT(*) as total_annotations,
   COUNT(DISTINCT username) as total_users
 FROM annotations;
+
+-- name: CountPendingImagesForUserAndStage :one
+WITH annotated_images AS (
+  SELECT image_id FROM annotations WHERE username = ? AND stage_index = ?
+)
+SELECT COUNT(*)
+FROM images i
+LEFT JOIN annotated_images ai ON i.id = ai.image_id
+WHERE i.is_finished = FALSE AND ai.image_id IS NULL;
+
+-- name: GetImageIDsWithAnnotation :many
+SELECT DISTINCT image_id
+FROM annotations
+WHERE stage_index = ? AND option_value = ?;
+
+-- name: CountImagesWithoutAnnotationForStage :one
+WITH annotated_images AS (
+  SELECT DISTINCT image_id FROM annotations WHERE stage_index = ?
+)
+SELECT COUNT(*)
+FROM images i
+LEFT JOIN annotated_images ai ON i.id = ai.image_id
+WHERE i.is_finished = FALSE AND ai.image_id IS NULL;
