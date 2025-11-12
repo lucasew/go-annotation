@@ -6,11 +6,87 @@
   </ul>
 </div>
 
+{{if and .Tasks (eq (len .Tasks) 1)}}
+<!-- Single task detail view with progress bar -->
+{{$task := index .Tasks 0}}
+<div class="card bg-base-200 shadow-xl mb-6">
+  <div class="card-body">
+    <h2 class="card-title">{{$task.ShortName}}</h2>
+    <p class="text-sm mb-4">{{$task.Name}}</p>
+
+    <div class="mt-3">
+      <div class="flex justify-between text-xs mb-1">
+        <span class="font-semibold">Progress</span>
+        <span>{{$task.CompletedCount}}/{{$task.TotalCount}} eligible ({{$task.PhaseProgress.Total}} total)</span>
+      </div>
+      {{if $task.PhaseProgress}}
+      {{if gt $task.PhaseProgress.Total 0}}
+      <!-- Android-style segmented progress bar -->
+      <div class="flex w-full h-8 rounded-lg overflow-hidden shadow-sm mb-4">
+        {{if gt $task.PhaseProgress.Completed 0}}
+        <div class="bg-success flex items-center justify-center text-success-content text-xs font-bold transition-all hover:opacity-90"
+             style="width: {{$task.PhaseProgress.CompletedPercent}}%"
+             title="{{$task.PhaseProgress.Completed}} completed ({{printf "%.1f" $task.PhaseProgress.CompletedPercent}}%)">
+          {{if gt $task.PhaseProgress.CompletedPercent 5.0}}{{$task.PhaseProgress.Completed}}{{end}}
+        </div>
+        {{end}}
+        {{if gt $task.PhaseProgress.Pending 0}}
+        <div class="bg-info flex items-center justify-center text-info-content text-xs font-bold transition-all hover:opacity-90"
+             style="width: {{$task.PhaseProgress.PendingPercent}}%"
+             title="{{$task.PhaseProgress.Pending}} pending ({{printf "%.1f" $task.PhaseProgress.PendingPercent}}%)">
+          {{if gt $task.PhaseProgress.PendingPercent 5.0}}{{$task.PhaseProgress.Pending}}{{end}}
+        </div>
+        {{end}}
+        {{if gt $task.PhaseProgress.NotYetAnnotated 0}}
+        <div class="bg-base-300 flex items-center justify-center text-base-content text-xs transition-all hover:opacity-90"
+             style="width: {{$task.PhaseProgress.NotYetAnnotatedPercent}}%"
+             title="{{$task.PhaseProgress.NotYetAnnotated}} not yet annotated in previous phase ({{printf "%.1f" $task.PhaseProgress.NotYetAnnotatedPercent}}%)">
+          {{if gt $task.PhaseProgress.NotYetAnnotatedPercent 5.0}}{{$task.PhaseProgress.NotYetAnnotated}}{{end}}
+        </div>
+        {{end}}
+        {{if gt $task.PhaseProgress.FilteredWrongClass 0}}
+        <div class="bg-error flex items-center justify-center text-error-content text-xs transition-all hover:opacity-90"
+             style="width: {{$task.PhaseProgress.FilteredPercent}}%"
+             title="{{$task.PhaseProgress.FilteredWrongClass}} annotated with wrong class in previous phase ({{printf "%.1f" $task.PhaseProgress.FilteredPercent}}%)">
+          {{if gt $task.PhaseProgress.FilteredPercent 5.0}}{{$task.PhaseProgress.FilteredWrongClass}}{{end}}
+        </div>
+        {{end}}
+      </div>
+      {{else}}
+      <progress class="progress progress-primary w-full mb-4" value="0" max="100"></progress>
+      {{end}}
+      {{end}}
+    </div>
+
+    {{if $task.If}}
+    <div class="mb-4">
+      <span class="text-xs font-semibold opacity-70">Dependencies:</span>
+      <div class="flex flex-wrap gap-1 mt-1">
+        {{range $depTask, $depValue := $task.If}}
+        <div class="badge badge-outline badge-sm">{{$depTask}}: {{$depValue}}</div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+
+    <div class="card-actions justify-end">
+      <a href="/help" class="btn btn-sm btn-ghost">Back to Overview</a>
+      {{if gt $task.AvailableCount 0}}
+      <a href="/annotate?task={{$task.ID}}" class="btn btn-sm btn-accent">Start Annotation</a>
+      {{else}}
+      <span class="text-xs opacity-70">All images annotated</span>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
 <div class="prose max-w-none">
   {{.HTMLContent}}
 </div>
 
 {{if .Tasks}}
+{{if gt (len .Tasks) 1}}
 <div class="mt-8">
   <h2 class="text-2xl font-bold mb-6">Annotation Phases</h2>
 
@@ -97,5 +173,6 @@
   </div>
   {{end}}
 </div>
+{{end}}
 {{end}}
 {{ end }}

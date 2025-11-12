@@ -668,6 +668,30 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 					}
 				}
 			}
+
+			// Get progress stats for this specific task
+			phaseProgress, err := a.GetPhaseProgressStats(r.Context(), helpTask)
+			if err != nil {
+				log.Printf("error getting phase progress for task %s: %s", helpTask, err)
+				phaseProgress = &PhaseProgress{}
+			}
+
+			// Get available count to check if there are images to annotate
+			availableCount, err := a.CountAvailableImages(r.Context(), helpTask)
+			if err != nil {
+				log.Printf("error counting available images for task %s: %s", helpTask, err)
+				availableCount = 0
+			}
+
+			tasks = []TaskWithCount{
+				{
+					ConfigTask:     task,
+					AvailableCount: availableCount,
+					TotalCount:     phaseProgress.Completed + phaseProgress.Pending,
+					CompletedCount: phaseProgress.Completed,
+					PhaseProgress:  phaseProgress,
+				},
+			}
 		} else {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
