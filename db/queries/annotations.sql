@@ -47,9 +47,11 @@ ORDER BY i.completed_stages ASC, i.id ASC
 LIMIT ?;
 
 -- name: CheckAnnotationExists :one
-SELECT COUNT(*) > 0 as exists
-FROM annotations
-WHERE image_id = ? AND username = ? AND stage_index = ?;
+SELECT EXISTS (
+    SELECT 1
+    FROM annotations
+    WHERE image_id = ? AND username = ? AND stage_index = ?
+);
 
 -- name: DeleteAnnotation :exec
 DELETE FROM annotations

@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"testing"
-	"time"
 )
 
 func TestImageRepository_Create(t *testing.T) {

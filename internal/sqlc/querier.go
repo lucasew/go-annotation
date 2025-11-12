@@ -6,26 +6,29 @@ package sqlc
 
 import (
 	"context"
-	"database/sql"
 )
 
-type DBTX interface {
-	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
-	PrepareContext(context.Context, string) (*sql.Stmt, error)
-	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
-	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+type Querier interface {
+	CheckAnnotationExists(ctx context.Context, arg CheckAnnotationExistsParams) (int64, error)
+	CountAnnotationsByUser(ctx context.Context, username string) (int64, error)
+	CountImages(ctx context.Context) (int64, error)
+	CountPendingImages(ctx context.Context) (int64, error)
+	CreateAnnotation(ctx context.Context, arg CreateAnnotationParams) (Annotation, error)
+	CreateImage(ctx context.Context, arg CreateImageParams) (Image, error)
+	DeleteAnnotation(ctx context.Context, id int64) error
+	DeleteAnnotationsForImage(ctx context.Context, imageID int64) error
+	DeleteImage(ctx context.Context, id int64) error
+	GetAnnotation(ctx context.Context, arg GetAnnotationParams) (Annotation, error)
+	GetAnnotationStats(ctx context.Context) (GetAnnotationStatsRow, error)
+	GetAnnotationsByImageAndUser(ctx context.Context, arg GetAnnotationsByImageAndUserParams) ([]Annotation, error)
+	GetAnnotationsByUser(ctx context.Context, arg GetAnnotationsByUserParams) ([]GetAnnotationsByUserRow, error)
+	GetAnnotationsForImage(ctx context.Context, imageID int64) ([]Annotation, error)
+	GetImage(ctx context.Context, id int64) (Image, error)
+	GetImageByPath(ctx context.Context, path string) (Image, error)
+	ListImages(ctx context.Context) ([]Image, error)
+	ListImagesNotFinished(ctx context.Context, limit int64) ([]Image, error)
+	ListPendingImagesForUserAndStage(ctx context.Context, limit int64) ([]Image, error)
+	UpdateImageCompletionStatus(ctx context.Context, arg UpdateImageCompletionStatusParams) error
 }
 
-func New(db DBTX) *Queries {
-	return &Queries{db: db}
-}
-
-type Queries struct {
-	db DBTX
-}
-
-func (q *Queries) WithTx(tx *sql.Tx) *Queries {
-	return &Queries{
-		db: tx,
-	}
-}
+var _ Querier = (*Queries)(nil)

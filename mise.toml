@@ -1,4 +1,6 @@
 [tools]
+"github:amacneil/dbmate" = "2.28.0"
+"github:sqlc-dev/sqlc" = "1.30.0"
 go = "1.25.4"
 node = "22"
 
@@ -18,16 +20,6 @@ run = "sqlc generate"
 description = "Run CI checks (gen + build)"
 depends = ["gen"]
 run = "go build -v ./cmd/go-annotation"
-
-[tasks."install-tools"]
-description = "Install required development tools (sqlc, dbmate)"
-run = """
-echo "Installing sqlc..."
-go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-echo "Installing dbmate..."
-go install github.com/amacneil/dbmate/v2@latest
-echo "✓ Tools installed"
-"""
 
 [tasks.test]
 description = "Run all tests with coverage"
