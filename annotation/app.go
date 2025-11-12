@@ -217,7 +217,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		var markdownBuilder strings.Builder
 		title := "Help"
 
-		fmt.Fprintf(&markdownBuilder, "# [<](/) %s\n", i("Project help"))
+		fmt.Fprintf(&markdownBuilder, "# %s\n", i("Project help"))
 		fmt.Fprintf(&markdownBuilder, "## %s\n", i("Description"))
 		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, i("(No description provided)")), "\n", "\n>"))
 
