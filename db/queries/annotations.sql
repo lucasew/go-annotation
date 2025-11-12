@@ -80,6 +80,13 @@ SELECT DISTINCT image_sha256
 FROM annotations
 WHERE stage_index = ? AND option_value = ?;
 
+-- name: CheckAnnotationExistsForImageStage :one
+SELECT EXISTS (
+    SELECT 1
+    FROM annotations
+    WHERE image_sha256 = ? AND stage_index = ?
+);
+
 -- name: CountImagesWithoutAnnotationForStage :one
 WITH annotated_images AS (
   SELECT DISTINCT image_sha256 FROM annotations WHERE stage_index = ?
@@ -88,3 +95,32 @@ SELECT COUNT(*)
 FROM images i
 LEFT JOIN annotated_images ai ON i.sha256 = ai.image_sha256
 WHERE ai.image_sha256 IS NULL;
+
+-- name: CountImagesWithAnnotation :one
+SELECT COUNT(DISTINCT image_sha256)
+FROM annotations
+WHERE stage_index = ? AND option_value = ?;
+
+-- name: GetAllImageSHA256s :many
+SELECT sha256 FROM images ORDER BY sha256;
+
+-- name: GetAnnotationsForStageAndValue :many
+SELECT image_sha256, username, annotated_at
+FROM annotations
+WHERE stage_index = ? AND option_value = ?
+ORDER BY image_sha256;
+
+-- name: GetImagesWithoutAnnotationForStage :many
+SELECT i.sha256, i.filename
+FROM images i
+WHERE NOT EXISTS (
+    SELECT 1 FROM annotations a
+    WHERE a.image_sha256 = i.sha256 AND a.stage_index = ?
+)
+ORDER BY i.filename;
+
+-- name: CountImagesWithAnnotationInList :one
+SELECT COUNT(DISTINCT image_sha256)
+FROM annotations
+WHERE stage_index = ? AND option_value = ?
+  AND image_sha256 IN (sqlc.slice('image_hashes'));

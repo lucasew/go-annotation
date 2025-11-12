@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -31,6 +32,26 @@ func (q *Queries) CheckAnnotationExists(ctx context.Context, arg CheckAnnotation
 	return column_1, err
 }
 
+const checkAnnotationExistsForImageStage = `-- name: CheckAnnotationExistsForImageStage :one
+SELECT EXISTS (
+    SELECT 1
+    FROM annotations
+    WHERE image_sha256 = ? AND stage_index = ?
+)
+`
+
+type CheckAnnotationExistsForImageStageParams struct {
+	ImageSha256 string `json:"image_sha256"`
+	StageIndex  int64  `json:"stage_index"`
+}
+
+func (q *Queries) CheckAnnotationExistsForImageStage(ctx context.Context, arg CheckAnnotationExistsForImageStageParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, checkAnnotationExistsForImageStage, arg.ImageSha256, arg.StageIndex)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countAnnotationsByUser = `-- name: CountAnnotationsByUser :one
 SELECT COUNT(*) FROM annotations
 WHERE username = ?
@@ -38,6 +59,56 @@ WHERE username = ?
 
 func (q *Queries) CountAnnotationsByUser(ctx context.Context, username string) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countAnnotationsByUser, username)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countImagesWithAnnotation = `-- name: CountImagesWithAnnotation :one
+SELECT COUNT(DISTINCT image_sha256)
+FROM annotations
+WHERE stage_index = ? AND option_value = ?
+`
+
+type CountImagesWithAnnotationParams struct {
+	StageIndex  int64  `json:"stage_index"`
+	OptionValue string `json:"option_value"`
+}
+
+func (q *Queries) CountImagesWithAnnotation(ctx context.Context, arg CountImagesWithAnnotationParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countImagesWithAnnotation, arg.StageIndex, arg.OptionValue)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countImagesWithAnnotationInList = `-- name: CountImagesWithAnnotationInList :one
+SELECT COUNT(DISTINCT image_sha256)
+FROM annotations
+WHERE stage_index = ? AND option_value = ?
+  AND image_sha256 IN (/*SLICE:image_hashes*/?)
+`
+
+type CountImagesWithAnnotationInListParams struct {
+	StageIndex  int64    `json:"stage_index"`
+	OptionValue string   `json:"option_value"`
+	ImageHashes []string `json:"image_hashes"`
+}
+
+func (q *Queries) CountImagesWithAnnotationInList(ctx context.Context, arg CountImagesWithAnnotationInListParams) (int64, error) {
+	query := countImagesWithAnnotationInList
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.StageIndex)
+	queryParams = append(queryParams, arg.OptionValue)
+	if len(arg.ImageHashes) > 0 {
+		for _, v := range arg.ImageHashes {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:image_hashes*/?", strings.Repeat(",?", len(arg.ImageHashes))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:image_hashes*/?", "NULL", 1)
+	}
+	row := q.db.QueryRowContext(ctx, query, queryParams...)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -136,6 +207,33 @@ WHERE image_sha256 = ?
 func (q *Queries) DeleteAnnotationsForImage(ctx context.Context, imageSha256 string) error {
 	_, err := q.db.ExecContext(ctx, deleteAnnotationsForImage, imageSha256)
 	return err
+}
+
+const getAllImageSHA256s = `-- name: GetAllImageSHA256s :many
+SELECT sha256 FROM images ORDER BY sha256
+`
+
+func (q *Queries) GetAllImageSHA256s(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getAllImageSHA256s)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var sha256 string
+		if err := rows.Scan(&sha256); err != nil {
+			return nil, err
+		}
+		items = append(items, sha256)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAnnotation = `-- name: GetAnnotation :one
@@ -317,6 +415,47 @@ func (q *Queries) GetAnnotationsForImage(ctx context.Context, imageSha256 string
 	return items, nil
 }
 
+const getAnnotationsForStageAndValue = `-- name: GetAnnotationsForStageAndValue :many
+SELECT image_sha256, username, annotated_at
+FROM annotations
+WHERE stage_index = ? AND option_value = ?
+ORDER BY image_sha256
+`
+
+type GetAnnotationsForStageAndValueParams struct {
+	StageIndex  int64  `json:"stage_index"`
+	OptionValue string `json:"option_value"`
+}
+
+type GetAnnotationsForStageAndValueRow struct {
+	ImageSha256 string     `json:"image_sha256"`
+	Username    string     `json:"username"`
+	AnnotatedAt *time.Time `json:"annotated_at"`
+}
+
+func (q *Queries) GetAnnotationsForStageAndValue(ctx context.Context, arg GetAnnotationsForStageAndValueParams) ([]GetAnnotationsForStageAndValueRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAnnotationsForStageAndValue, arg.StageIndex, arg.OptionValue)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAnnotationsForStageAndValueRow{}
+	for rows.Next() {
+		var i GetAnnotationsForStageAndValueRow
+		if err := rows.Scan(&i.ImageSha256, &i.Username, &i.AnnotatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getImageHashesWithAnnotation = `-- name: GetImageHashesWithAnnotation :many
 SELECT DISTINCT image_sha256
 FROM annotations
@@ -341,6 +480,44 @@ func (q *Queries) GetImageHashesWithAnnotation(ctx context.Context, arg GetImage
 			return nil, err
 		}
 		items = append(items, image_sha256)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImagesWithoutAnnotationForStage = `-- name: GetImagesWithoutAnnotationForStage :many
+SELECT i.sha256, i.filename
+FROM images i
+WHERE NOT EXISTS (
+    SELECT 1 FROM annotations a
+    WHERE a.image_sha256 = i.sha256 AND a.stage_index = ?
+)
+ORDER BY i.filename
+`
+
+type GetImagesWithoutAnnotationForStageRow struct {
+	Sha256   string `json:"sha256"`
+	Filename string `json:"filename"`
+}
+
+func (q *Queries) GetImagesWithoutAnnotationForStage(ctx context.Context) ([]GetImagesWithoutAnnotationForStageRow, error) {
+	rows, err := q.db.QueryContext(ctx, getImagesWithoutAnnotationForStage)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImagesWithoutAnnotationForStageRow{}
+	for rows.Next() {
+		var i GetImagesWithoutAnnotationForStageRow
+		if err := rows.Scan(&i.Sha256, &i.Filename); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

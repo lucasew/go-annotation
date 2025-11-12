@@ -238,18 +238,17 @@ func (r *AnnotationRepository) CountPendingImagesForUserAndStage(ctx context.Con
 
 // CheckAnnotationExists checks if any annotation exists for an image at a stage (any user)
 func (r *AnnotationRepository) CheckAnnotationExists(ctx context.Context, imageSHA256 string, username string, stageIndex int64) (bool, error) {
-	// If username is empty, check if any annotation exists for this image+stage
+	// If username is empty, check if any annotation exists for this image+stage using optimized query
 	if username == "" {
-		anns, err := r.queries.GetAnnotationsForImage(ctx, imageSHA256)
+		params := sqlc.CheckAnnotationExistsForImageStageParams{
+			ImageSha256: imageSHA256,
+			StageIndex:  stageIndex,
+		}
+		exists, err := r.queries.CheckAnnotationExistsForImageStage(ctx, params)
 		if err != nil {
 			return false, err
 		}
-		for _, ann := range anns {
-			if ann.StageIndex == stageIndex {
-				return true, nil
-			}
-		}
-		return false, nil
+		return exists > 0, nil
 	}
 	// Otherwise use the specific user check
 	return r.Exists(ctx, imageSHA256, username, int(stageIndex))

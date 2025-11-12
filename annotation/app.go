@@ -17,6 +17,7 @@ import (
 
 	"math/rand"
 
+	"github.com/lucasew/go-annotation/internal/domain"
 	"github.com/lucasew/go-annotation/internal/repository"
 )
 
@@ -87,6 +88,29 @@ type PhaseProgress struct {
 	NotYetAnnotatedPercent float64 // Percentage of not yet annotated images
 }
 
+// getCachedImageList returns the list of all images, using cache if available
+func (a *AnnotatorApp) getCachedImageList(ctx context.Context) ([]*domain.Image, error) {
+	// Try to get from cache first
+	if cache := GetRequestCache(ctx); cache != nil {
+		if images, ok := cache.GetImages(); ok {
+			return images, nil
+		}
+	}
+
+	// Cache miss or no cache available, fetch from database
+	images, err := a.imageRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store in cache if available
+	if cache := GetRequestCache(ctx); cache != nil {
+		cache.SetImages(images)
+	}
+
+	return images, nil
+}
+
 // CountEligibleImages counts all images that are eligible for this task (regardless of annotation status)
 func (a *AnnotatorApp) CountEligibleImages(ctx context.Context, taskID string) (int, error) {
 	// Find stage index for this task
@@ -109,8 +133,37 @@ func (a *AnnotatorApp) CountEligibleImages(ctx context.Context, taskID string) (
 		return int(count), err
 	}
 
-	// Get all images and filter by dependencies
-	allImages, err := a.imageRepo.List(ctx)
+	// Pre-fetch all dependency data before looping (optimization: move queries outside loop)
+	imageHashesByDep := make(map[string]map[string]bool)
+	for depTaskID, requiredValue := range task.If {
+		// Find the stage index for the dependency task
+		depStageIndex := -1
+		for i, t := range a.Config.Tasks {
+			if t.ID == depTaskID {
+				depStageIndex = i
+				break
+			}
+		}
+		if depStageIndex == -1 {
+			continue
+		}
+
+		// Fetch all image hashes for this dependency ONCE
+		imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+		if err != nil {
+			return 0, fmt.Errorf("while checking dependency: %w", err)
+		}
+
+		// Convert to map for O(1) lookup
+		hashSet := make(map[string]bool, len(imageHashes))
+		for _, hash := range imageHashes {
+			hashSet[hash] = true
+		}
+		imageHashesByDep[depTaskID] = hashSet
+	}
+
+	// Get all images and filter by dependencies (using cache)
+	allImages, err := a.getCachedImageList(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("while listing images: %w", err)
 	}
@@ -118,34 +171,9 @@ func (a *AnnotatorApp) CountEligibleImages(ctx context.Context, taskID string) (
 	validCount := 0
 	for _, img := range allImages {
 		valid := true
-		// Check each dependency
-		for depTaskID, requiredValue := range task.If {
-			// Find the stage index for the dependency task
-			depStageIndex := -1
-			for i, t := range a.Config.Tasks {
-				if t.ID == depTaskID {
-					depStageIndex = i
-					break
-				}
-			}
-			if depStageIndex == -1 {
-				continue
-			}
-
-			// Check if this image has the required annotation value for the dependency
-			hasValidAnnotation := false
-			imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
-			if err != nil {
-				return 0, fmt.Errorf("while checking dependency: %w", err)
-			}
-			for _, hash := range imageHashes {
-				if hash == img.SHA256 {
-					hasValidAnnotation = true
-					break
-				}
-			}
-
-			if !hasValidAnnotation {
+		// Check each dependency using pre-fetched map
+		for depTaskID := range task.If {
+			if !imageHashesByDep[depTaskID][img.SHA256] {
 				valid = false
 				break
 			}
@@ -183,8 +211,37 @@ func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) 
 	// Handle task dependencies (If field)
 	// If there are dependencies, we need to filter images that meet the criteria
 	if len(task.If) > 0 {
-		// Get all candidate images
-		allImages, err := a.imageRepo.List(ctx)
+		// Pre-fetch all dependency data before looping (optimization: move queries outside loop)
+		imageHashesByDep := make(map[string]map[string]bool)
+		for depTaskID, requiredValue := range task.If {
+			// Find the stage index for the dependency task
+			depStageIndex := -1
+			for i, t := range a.Config.Tasks {
+				if t.ID == depTaskID {
+					depStageIndex = i
+					break
+				}
+			}
+			if depStageIndex == -1 {
+				continue
+			}
+
+			// Fetch all image hashes for this dependency ONCE
+			imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+			if err != nil {
+				return 0, fmt.Errorf("while checking dependency: %w", err)
+			}
+
+			// Convert to map for O(1) lookup
+			hashSet := make(map[string]bool, len(imageHashes))
+			for _, hash := range imageHashes {
+				hashSet[hash] = true
+			}
+			imageHashesByDep[depTaskID] = hashSet
+		}
+
+		// Get all candidate images (using cache)
+		allImages, err := a.getCachedImageList(ctx)
 		if err != nil {
 			return 0, fmt.Errorf("while listing images: %w", err)
 		}
@@ -192,35 +249,9 @@ func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) 
 		validCount := 0
 		for _, img := range allImages {
 			valid := true
-			// Check each dependency
-			for depTaskID, requiredValue := range task.If {
-				// Find the stage index for the dependency task
-				depStageIndex := -1
-				for i, t := range a.Config.Tasks {
-					if t.ID == depTaskID {
-						depStageIndex = i
-						break
-					}
-				}
-				if depStageIndex == -1 {
-					continue
-				}
-
-				// Check if this image has the required annotation value for the dependency
-				hasValidAnnotation := false
-				// We need to check if ANY user has annotated this image with the required value
-				imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
-				if err != nil {
-					return 0, fmt.Errorf("while checking dependency: %w", err)
-				}
-				for _, hash := range imageHashes {
-					if hash == img.SHA256 {
-						hasValidAnnotation = true
-						break
-					}
-				}
-
-				if !hasValidAnnotation {
+			// Check each dependency using pre-fetched map
+			for depTaskID := range task.If {
+				if !imageHashesByDep[depTaskID][img.SHA256] {
 					valid = false
 					break
 				}
@@ -290,8 +321,36 @@ func (a *AnnotatorApp) GetPhaseProgressStats(ctx context.Context, taskID string)
 
 		// If task has dependencies, analyze the not-eligible images
 		if len(task.If) > 0 {
-			// Get all images
-			allImages, err := a.imageRepo.List(ctx)
+			// Pre-fetch all dependency data before looping (optimization: move queries outside loop)
+			imageHashesByDep := make(map[string]map[string]bool)
+			for depTaskID, requiredValue := range task.If {
+				depStageIndex := -1
+				for i, t := range a.Config.Tasks {
+					if t.ID == depTaskID {
+						depStageIndex = i
+						break
+					}
+				}
+				if depStageIndex == -1 {
+					continue
+				}
+
+				// Fetch all image hashes for this dependency ONCE
+				imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+				if err != nil {
+					return nil, fmt.Errorf("while checking dependency: %w", err)
+				}
+
+				// Convert to map for O(1) lookup
+				hashSet := make(map[string]bool, len(imageHashes))
+				for _, hash := range imageHashes {
+					hashSet[hash] = true
+				}
+				imageHashesByDep[depTaskID] = hashSet
+			}
+
+			// Get all images (using cache)
+			allImages, err := a.getCachedImageList(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("while listing images: %w", err)
 			}
@@ -300,32 +359,9 @@ func (a *AnnotatorApp) GetPhaseProgressStats(ctx context.Context, taskID string)
 			eligibleHashes := make(map[string]bool)
 			for _, img := range allImages {
 				valid := true
-				for depTaskID, requiredValue := range task.If {
-					depStageIndex := -1
-					for i, t := range a.Config.Tasks {
-						if t.ID == depTaskID {
-							depStageIndex = i
-							break
-						}
-					}
-					if depStageIndex == -1 {
-						continue
-					}
-
-					imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
-					if err != nil {
-						return nil, fmt.Errorf("while checking dependency: %w", err)
-					}
-
-					hasValidAnnotation := false
-					for _, hash := range imageHashes {
-						if hash == img.SHA256 {
-							hasValidAnnotation = true
-							break
-						}
-					}
-
-					if !hasValidAnnotation {
+				// Check each dependency using pre-fetched map
+				for depTaskID := range task.If {
+					if !imageHashesByDep[depTaskID][img.SHA256] {
 						valid = false
 						break
 					}
@@ -426,8 +462,39 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 
 	task := a.Config.Tasks[stageIndex]
 
-	// Get images without annotation for this stage
-	allImages, err := a.imageRepo.List(ctx)
+	// Pre-fetch all dependency data before looping (optimization: move queries outside loop)
+	imageHashesByDep := make(map[string]map[string]bool)
+	if len(task.If) > 0 {
+		for depTaskID, requiredValue := range task.If {
+			// Find the stage index for the dependency task
+			depStageIndex := -1
+			for i, t := range a.Config.Tasks {
+				if t.ID == depTaskID {
+					depStageIndex = i
+					break
+				}
+			}
+			if depStageIndex == -1 {
+				continue
+			}
+
+			// Fetch all image hashes for this dependency ONCE
+			imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+			if err != nil {
+				return nil, fmt.Errorf("while checking dependency: %w", err)
+			}
+
+			// Convert to map for O(1) lookup
+			hashSet := make(map[string]bool, len(imageHashes))
+			for _, hash := range imageHashes {
+				hashSet[hash] = true
+			}
+			imageHashesByDep[depTaskID] = hashSet
+		}
+	}
+
+	// Get images without annotation for this stage (using cache)
+	allImages, err := a.getCachedImageList(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("while listing images: %w", err)
 	}
@@ -444,37 +511,11 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 			continue // Skip images that already have annotation
 		}
 
-		// Check task dependencies (If field)
+		// Check task dependencies (If field) using pre-fetched map
 		valid := true
 		if len(task.If) > 0 {
-			for depTaskID, requiredValue := range task.If {
-				// Find the stage index for the dependency task
-				depStageIndex := -1
-				for i, t := range a.Config.Tasks {
-					if t.ID == depTaskID {
-						depStageIndex = i
-						break
-					}
-				}
-				if depStageIndex == -1 {
-					continue
-				}
-
-				// Check if this image has the required annotation value for the dependency
-				imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
-				if err != nil {
-					return nil, fmt.Errorf("while checking dependency: %w", err)
-				}
-
-				hasValidAnnotation := false
-				for _, hash := range imageHashes {
-					if hash == img.SHA256 {
-						hasValidAnnotation = true
-						break
-					}
-				}
-
-				if !hasValidAnnotation {
+			for depTaskID := range task.If {
+				if !imageHashesByDep[depTaskID][img.SHA256] {
 					valid = false
 					break
 				}
@@ -867,6 +908,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	var handler http.Handler = mux
 	handler = HTTPLogger(handler)
 	handler = a.authenticationMiddleware(handler)
+	handler = requestCacheMiddleware(handler)
 	return handler
 }
 
