@@ -76,6 +76,16 @@ type TaskWithCount struct {
 	CompletedCount int
 }
 
+type PhaseProgress struct {
+	Completed        int     // Images completed in this phase
+	Pending          int     // Images eligible but not yet annotated
+	Filtered         int     // Images filtered out by previous phases
+	Total            int     // Total images in the entire dataset
+	CompletedPercent float64 // Percentage of completed images
+	PendingPercent   float64 // Percentage of pending images
+	FilteredPercent  float64 // Percentage of filtered images
+}
+
 // CountEligibleImages counts all images that are eligible for this task (regardless of annotation status)
 func (a *AnnotatorApp) CountEligibleImages(ctx context.Context, taskID string) (int, error) {
 	// Find stage index for this task
@@ -230,6 +240,55 @@ func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) 
 	}
 
 	return int(count), nil
+}
+
+// GetPhaseProgressStats calculates comprehensive progress statistics for a task
+func (a *AnnotatorApp) GetPhaseProgressStats(ctx context.Context, taskID string) (*PhaseProgress, error) {
+	// Get total images in the entire dataset
+	totalCount, err := a.imageRepo.Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("while counting total images: %w", err)
+	}
+
+	// Get eligible images (that pass filters from previous phases)
+	eligibleCount, err := a.CountEligibleImages(ctx, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("while counting eligible images: %w", err)
+	}
+
+	// Get available images (eligible but not yet annotated)
+	availableCount, err := a.CountAvailableImages(ctx, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("while counting available images: %w", err)
+	}
+
+	// Calculate statistics
+	completed := eligibleCount - availableCount
+	if completed < 0 {
+		completed = 0
+	}
+	pending := availableCount
+	filtered := int(totalCount) - eligibleCount
+
+	total := int(totalCount)
+
+	// Calculate percentages
+	var completedPercent, pendingPercent, filteredPercent float64
+	if total > 0 {
+		completedPercent = float64(completed) / float64(total) * 100
+		pendingPercent = float64(pending) / float64(total) * 100
+		filteredPercent = float64(filtered) / float64(total) * 100
+	}
+
+	return &PhaseProgress{
+		Completed:        completed,
+		Pending:          pending,
+		Filtered:         filtered,
+		Total:            total,
+		CompletedPercent: completedPercent,
+		PendingPercent:   pendingPercent,
+		FilteredPercent:  filteredPercent,
+	}, nil
 }
 
 func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*AnnotationStep, error) {
@@ -622,12 +681,12 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			})
 		}
 
-		// Get progress information
-		availableCount, _ := a.CountAvailableImages(r.Context(), taskID)
-		totalEligible, _ := a.CountEligibleImages(r.Context(), taskID)
-		completedCount := totalEligible - availableCount
-		if completedCount < 0 {
-			completedCount = 0
+		// Get comprehensive progress information
+		phaseProgress, err := a.GetPhaseProgressStats(r.Context(), taskID)
+		if err != nil {
+			log.Printf("error getting phase progress: %s", err)
+			// Fallback to empty progress
+			phaseProgress = &PhaseProgress{}
 		}
 
 		data := map[string]interface{}{
@@ -637,14 +696,16 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			"ImageID":       imageID,
 			"ImageFilename": imageFilename,
 			"Classes":       classes,
+			"PhaseProgress": phaseProgress,
+			// Keep old Progress for backward compatibility
 			"Progress": map[string]interface{}{
-				"AvailableCount": availableCount,
-				"TotalCount":     totalEligible,
-				"CompletedCount": completedCount,
+				"AvailableCount": phaseProgress.Pending,
+				"TotalCount":     phaseProgress.Completed + phaseProgress.Pending,
+				"CompletedCount": phaseProgress.Completed,
 			},
 		}
 
-		err := RenderPage(w, "annotate.html", data)
+		err = RenderPage(w, "annotate.html", data)
 		if err != nil {
 			log.Printf("error rendering annotate template: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
