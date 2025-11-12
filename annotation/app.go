@@ -63,6 +63,31 @@ type AnnotationStep struct {
 	ImageName string
 }
 
+type TaskWithCount struct {
+	*ConfigTask
+	AvailableCount int
+}
+
+func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) (int, error) {
+	task := a.GetTask(taskID)
+	if task == nil {
+		return 0, fmt.Errorf("task not found: %s", taskID)
+	}
+
+	filters := ""
+	for criteriaTask, criteriaValue := range task.If {
+		filters = fmt.Sprintf("and (image in (select image from task_%s where value = '%s' and sure = 1 ))", criteriaTask, criteriaValue)
+	}
+
+	var count int
+	err := a.Database.QueryRowContext(ctx, fmt.Sprintf("select count(*) from task_%s where value is NULL %s", task.ID, filters)).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("while counting available images: %w", err)
+	}
+
+	return count, nil
+}
+
 func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*AnnotationStep, error) {
 	if taskID == "" {
 		for _, task := range a.Config.Tasks {
@@ -221,12 +246,21 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		fmt.Fprintf(&markdownBuilder, "## %s\n", i("Description"))
 		fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(a.Config.Meta.Description, i("(No description provided)")), "\n", "\n>"))
 
-		var tasks []*ConfigTask = nil
+		var tasks []TaskWithCount = nil
 
 		if len(itemPath) == 1 {
 			fmt.Fprintf(&markdownBuilder, "## %s\n\n", i("Phases"))
-			tasks = a.Config.Tasks
+			tasks = make([]TaskWithCount, 0, len(a.Config.Tasks))
 			for _, task := range a.Config.Tasks {
+				count, err := a.CountAvailableImages(r.Context(), task.ID)
+				if err != nil {
+					log.Printf("error counting available images for task %s: %s", task.ID, err)
+					count = 0
+				}
+				tasks = append(tasks, TaskWithCount{
+					ConfigTask:     task,
+					AvailableCount: count,
+				})
 				fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
 				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, i("(No description provided)")), "\n", "\n>"))
 			}
@@ -279,7 +313,8 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		itemPath := pathParts(r.URL.Path)
 
 		if len(itemPath) != 3 {
-			step, err := a.NextAnnotationStep(r.Context(), "")
+			taskID := r.URL.Query().Get("task")
+			step, err := a.NextAnnotationStep(r.Context(), taskID)
 			if err != nil {
 				log.Printf("error in annotate when getting next step from scratch: %s", err)
 				w.WriteHeader(500)

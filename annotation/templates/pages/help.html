@@ -15,10 +15,16 @@
   {{range .Tasks}}
   <div class="card bg-base-200 shadow-xl">
     <div class="card-body">
-      <h2 class="card-title">{{.ShortName}}</h2>
+      <h2 class="card-title">
+        {{.ShortName}}
+        <div class="badge badge-secondary">{{.AvailableCount}} images</div>
+      </h2>
       <p>{{.Name}}</p>
       <div class="card-actions justify-end">
         <a href="/help/{{.ID}}" class="btn btn-sm btn-primary">View Details</a>
+        {{if gt .AvailableCount 0}}
+        <a href="/annotate?task={{.ID}}" class="btn btn-sm btn-accent">Annotate</a>
+        {{end}}
       </div>
     </div>
   </div>
