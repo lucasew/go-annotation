@@ -47,9 +47,9 @@
             </div>
             {{end}}
             {{if gt $task.PhaseProgress.Filtered 0}}
-            <div class="bg-base-300 flex items-center justify-center text-base-content text-xs transition-all hover:opacity-90"
+            <div class="bg-error flex items-center justify-center text-error-content text-xs transition-all hover:opacity-90"
                  style="width: {{$task.PhaseProgress.FilteredPercent}}%"
-                 title="{{$task.PhaseProgress.Filtered}} filtered ({{printf "%.1f" $task.PhaseProgress.FilteredPercent}}%)">
+                 title="{{$task.PhaseProgress.Filtered}} not applicable - filtered by previous phase ({{printf "%.1f" $task.PhaseProgress.FilteredPercent}}%)">
               {{if gt $task.PhaseProgress.FilteredPercent 5.0}}{{$task.PhaseProgress.Filtered}}{{end}}
             </div>
             {{end}}
