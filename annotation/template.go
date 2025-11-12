@@ -2,7 +2,6 @@ package annotation
 
 import (
 	"embed"
-	"fmt"
 	"html/template"
 	"io"
 	"maps"
@@ -27,7 +26,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("css: %s", cssContent)
 }
 
 // RenderPage renders a page using mold with automatic CSS injection
