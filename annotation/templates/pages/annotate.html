@@ -30,43 +30,7 @@
         </svg>
       </a>
     </div>
-    {{if .PhaseProgress}}
-    {{if gt .PhaseProgress.Total 0}}
-    <!-- Android-style segmented progress bar -->
-    <div class="flex w-full h-8 rounded-lg overflow-hidden mb-3 shadow-sm">
-      {{if gt .PhaseProgress.Completed 0}}
-      <div class="bg-success flex items-center justify-center text-success-content text-xs font-bold transition-all hover:opacity-90"
-           style="width: {{.PhaseProgress.CompletedPercent}}%"
-           title="{{.PhaseProgress.Completed}} completed ({{printf "%.1f" .PhaseProgress.CompletedPercent}}%)">
-        {{if gt .PhaseProgress.CompletedPercent 5.0}}{{.PhaseProgress.Completed}}{{end}}
-      </div>
-      {{end}}
-      {{if gt .PhaseProgress.Pending 0}}
-      <div class="bg-info flex items-center justify-center text-info-content text-xs font-bold transition-all hover:opacity-90"
-           style="width: {{.PhaseProgress.PendingPercent}}%"
-           title="{{.PhaseProgress.Pending}} pending ({{printf "%.1f" .PhaseProgress.PendingPercent}}%)">
-        {{if gt .PhaseProgress.PendingPercent 5.0}}{{.PhaseProgress.Pending}}{{end}}
-      </div>
-      {{end}}
-      {{if gt .PhaseProgress.NotYetAnnotated 0}}
-      <div class="bg-base-300 flex items-center justify-center text-base-content text-xs transition-all hover:opacity-90"
-           style="width: {{.PhaseProgress.NotYetAnnotatedPercent}}%"
-           title="{{.PhaseProgress.NotYetAnnotated}} not yet annotated in previous phase ({{printf "%.1f" .PhaseProgress.NotYetAnnotatedPercent}}%)">
-        {{if gt .PhaseProgress.NotYetAnnotatedPercent 5.0}}{{.PhaseProgress.NotYetAnnotated}}{{end}}
-      </div>
-      {{end}}
-      {{if gt .PhaseProgress.FilteredWrongClass 0}}
-      <div class="bg-error flex items-center justify-center text-error-content text-xs transition-all hover:opacity-90"
-           style="width: {{.PhaseProgress.FilteredPercent}}%"
-           title="{{.PhaseProgress.FilteredWrongClass}} annotated with wrong class in previous phase ({{printf "%.1f" .PhaseProgress.FilteredPercent}}%)">
-        {{if gt .PhaseProgress.FilteredPercent 5.0}}{{.PhaseProgress.FilteredWrongClass}}{{end}}
-      </div>
-      {{end}}
-    </div>
-    {{else}}
-    <progress class="progress progress-primary w-full" value="0" max="100"></progress>
-    {{end}}
-    {{end}}
+    {{template "progressBar" .PhaseProgress}}
   </div>
 </div>
 
