@@ -622,6 +622,14 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			})
 		}
 
+		// Get progress information
+		availableCount, _ := a.CountAvailableImages(r.Context(), taskID)
+		totalEligible, _ := a.CountEligibleImages(r.Context(), taskID)
+		completedCount := totalEligible - availableCount
+		if completedCount < 0 {
+			completedCount = 0
+		}
+
 		data := map[string]interface{}{
 			"Title":         i("annotation"),
 			"TaskID":        taskID,
@@ -629,6 +637,11 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			"ImageID":       imageID,
 			"ImageFilename": imageFilename,
 			"Classes":       classes,
+			"Progress": map[string]interface{}{
+				"AvailableCount": availableCount,
+				"TotalCount":     totalEligible,
+				"CompletedCount": completedCount,
+			},
 		}
 
 		err := RenderPage(w, "annotate.html", data)

@@ -7,6 +7,20 @@
   </ul>
 </div>
 
+{{if .Progress}}
+<div class="mb-4">
+  <div class="flex justify-between text-xs mb-1">
+    <span class="font-semibold">Task Progress</span>
+    <span>{{.Progress.CompletedCount}}/{{.Progress.TotalCount}} images ({{.Progress.AvailableCount}} remaining)</span>
+  </div>
+  {{if gt .Progress.TotalCount 0}}
+  <progress class="progress progress-primary w-full" value="{{.Progress.CompletedCount}}" max="{{.Progress.TotalCount}}"></progress>
+  {{else}}
+  <progress class="progress progress-primary w-full" value="0" max="100"></progress>
+  {{end}}
+</div>
+{{end}}
+
 <div class="card bg-base-200 shadow-xl mb-4">
   <div class="card-body">
     <div class="flex justify-between items-center">
