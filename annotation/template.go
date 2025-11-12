@@ -31,7 +31,7 @@ func init() {
 func RenderPage(w io.Writer, pageName string, data map[string]interface{}) error {
 	// Inject CSS automatically
 	if data == nil {
-		data = make(map[string]interface{})
+		data = make(map[string]any)
 	}
 	data["CSS"] = template.CSS(cssContent)
 
