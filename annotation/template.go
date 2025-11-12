@@ -16,13 +16,19 @@ var (
 
 	// Template manager with mold for layout support
 	templateManager *TemplateManager = nil
+
+	// TemplateFuncMap contains custom template functions available globally
+	TemplateFuncMap = template.FuncMap{
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
+	}
 )
 
 func init() {
 	// Initialize template manager with mold
 	// Mold will automatically parse all templates from the embed.FS
 	var err error
-	templateManager, err = NewTemplateManager(templateFS)
+	templateManager, err = NewTemplateManagerWithFuncMap(templateFS, TemplateFuncMap)
 	if err != nil {
 		panic(err)
 	}

@@ -369,7 +369,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		var tasks []TaskWithCount = nil
 
 		if len(itemPath) == 1 {
-			fmt.Fprintf(&markdownBuilder, "## %s\n\n", i("Phases"))
+			// Only populate tasks for the timeline view (no markdown for tasks)
 			tasks = make([]TaskWithCount, 0, len(a.Config.Tasks))
 			for _, task := range a.Config.Tasks {
 				count, err := a.CountAvailableImages(r.Context(), task.ID)
@@ -381,8 +381,6 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 					ConfigTask:     task,
 					AvailableCount: count,
 				})
-				fmt.Fprintf(&markdownBuilder, "### [%s](/help/%s)\n", task.ShortName, task.ID)
-				fmt.Fprintf(&markdownBuilder, "> %s\n\n", strings.ReplaceAll(stringOr(task.Name, i("(No description provided)")), "\n", "\n>"))
 			}
 		} else if len(itemPath) == 2 {
 			helpTask := itemPath[1]

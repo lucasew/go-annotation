@@ -40,6 +40,22 @@ func NewTemplateManager(templateFS embed.FS, options ...mold.Option) (*TemplateM
 	}, nil
 }
 
+// NewTemplateManagerWithFuncMap creates a new template manager with custom template functions
+func NewTemplateManagerWithFuncMap(templateFS embed.FS, funcMap template.FuncMap, options ...mold.Option) (*TemplateManager, error) {
+	opts := options
+	opts = append(opts, mold.WithRoot("templates"))
+	opts = append(opts, mold.WithLayout("layout.html"))
+	opts = append(opts, mold.WithFuncMap(funcMap))
+	engine, err := mold.New(templateFS, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TemplateManager{
+		engine: engine,
+	}, nil
+}
+
 // NewTemplateManagerWithFS creates a template manager from a plain fs.FS
 func NewTemplateManagerWithFS(fsys fs.FS, options ...mold.Option) (*TemplateManager, error) {
 	engine, err := mold.New(fsys, options...)
