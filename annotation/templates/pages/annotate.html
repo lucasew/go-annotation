@@ -48,11 +48,18 @@
         {{if gt .PhaseProgress.PendingPercent 5.0}}{{.PhaseProgress.Pending}}{{end}}
       </div>
       {{end}}
-      {{if gt .PhaseProgress.Filtered 0}}
+      {{if gt .PhaseProgress.NotYetAnnotated 0}}
+      <div class="bg-base-300 flex items-center justify-center text-base-content text-xs transition-all hover:opacity-90"
+           style="width: {{.PhaseProgress.NotYetAnnotatedPercent}}%"
+           title="{{.PhaseProgress.NotYetAnnotated}} not yet annotated in previous phase ({{printf "%.1f" .PhaseProgress.NotYetAnnotatedPercent}}%)">
+        {{if gt .PhaseProgress.NotYetAnnotatedPercent 5.0}}{{.PhaseProgress.NotYetAnnotated}}{{end}}
+      </div>
+      {{end}}
+      {{if gt .PhaseProgress.FilteredWrongClass 0}}
       <div class="bg-error flex items-center justify-center text-error-content text-xs transition-all hover:opacity-90"
            style="width: {{.PhaseProgress.FilteredPercent}}%"
-           title="{{.PhaseProgress.Filtered}} not applicable - filtered by previous phase ({{printf "%.1f" .PhaseProgress.FilteredPercent}}%)">
-        {{if gt .PhaseProgress.FilteredPercent 5.0}}{{.PhaseProgress.Filtered}}{{end}}
+           title="{{.PhaseProgress.FilteredWrongClass}} annotated with wrong class in previous phase ({{printf "%.1f" .PhaseProgress.FilteredPercent}}%)">
+        {{if gt .PhaseProgress.FilteredPercent 5.0}}{{.PhaseProgress.FilteredWrongClass}}{{end}}
       </div>
       {{end}}
     </div>

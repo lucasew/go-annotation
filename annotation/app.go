@@ -78,13 +78,15 @@ type TaskWithCount struct {
 }
 
 type PhaseProgress struct {
-	Completed        int     // Images completed in this phase
-	Pending          int     // Images eligible but not yet annotated
-	Filtered         int     // Images filtered out by previous phases
-	Total            int     // Total images in the entire dataset
-	CompletedPercent float64 // Percentage of completed images
-	PendingPercent   float64 // Percentage of pending images
-	FilteredPercent  float64 // Percentage of filtered images
+	Completed            int     // Images completed in this phase
+	Pending              int     // Images eligible but not yet annotated
+	FilteredWrongClass   int     // Images annotated in dependency phase but with wrong class
+	NotYetAnnotated      int     // Images not yet annotated in dependency phase
+	Total                int     // Total images in the entire dataset
+	CompletedPercent     float64 // Percentage of completed images
+	PendingPercent       float64 // Percentage of pending images
+	FilteredPercent      float64 // Percentage of filtered (wrong class) images
+	NotYetAnnotatedPercent float64 // Percentage of not yet annotated images
 }
 
 // CountEligibleImages counts all images that are eligible for this task (regardless of annotation status)
@@ -263,32 +265,136 @@ func (a *AnnotatorApp) GetPhaseProgressStats(ctx context.Context, taskID string)
 		return nil, fmt.Errorf("while counting available images: %w", err)
 	}
 
-	// Calculate statistics
+	// Calculate completed and pending
 	completed := eligibleCount - availableCount
 	if completed < 0 {
 		completed = 0
 	}
 	pending := availableCount
-	filtered := int(totalCount) - eligibleCount
 
 	total := int(totalCount)
+	notEligible := total - eligibleCount
+
+	// Now differentiate between filtered (annotated with wrong class) and not yet annotated
+	var filteredWrongClass, notYetAnnotated int
+
+	// Find task and check if it has dependencies
+	stageIndex := -1
+	for i, task := range a.Config.Tasks {
+		if task.ID == taskID {
+			stageIndex = i
+			break
+		}
+	}
+
+	if stageIndex != -1 {
+		task := a.Config.Tasks[stageIndex]
+
+		// If task has dependencies, analyze the not-eligible images
+		if len(task.If) > 0 {
+			// Get all images
+			allImages, err := a.imageRepo.List(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("while listing images: %w", err)
+			}
+
+			// Get images that passed the filter (eligible)
+			eligibleHashes := make(map[string]bool)
+			for _, img := range allImages {
+				valid := true
+				for depTaskID, requiredValue := range task.If {
+					depStageIndex := -1
+					for i, t := range a.Config.Tasks {
+						if t.ID == depTaskID {
+							depStageIndex = i
+							break
+						}
+					}
+					if depStageIndex == -1 {
+						continue
+					}
+
+					imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+					if err != nil {
+						return nil, fmt.Errorf("while checking dependency: %w", err)
+					}
+
+					hasValidAnnotation := false
+					for _, hash := range imageHashes {
+						if hash == img.SHA256 {
+							hasValidAnnotation = true
+							break
+						}
+					}
+
+					if !hasValidAnnotation {
+						valid = false
+						break
+					}
+				}
+
+				if valid {
+					eligibleHashes[img.SHA256] = true
+				}
+			}
+
+			// Check not-eligible images to see if they were annotated in dependency phase
+			for _, img := range allImages {
+				if !eligibleHashes[img.SHA256] {
+					// This image is not eligible - check if it was annotated in dependency phase
+					annotatedInDep := false
+					for depTaskID := range task.If {
+						depStageIndex := -1
+						for i, t := range a.Config.Tasks {
+							if t.ID == depTaskID {
+								depStageIndex = i
+								break
+							}
+						}
+						if depStageIndex == -1 {
+							continue
+						}
+
+						// Check if this image has ANY annotation in the dependency phase
+						hasAnnotation, err := a.annotationRepo.CheckAnnotationExists(ctx, img.SHA256, "", int64(depStageIndex))
+						if err == nil && hasAnnotation {
+							annotatedInDep = true
+							break
+						}
+					}
+
+					if annotatedInDep {
+						filteredWrongClass++
+					} else {
+						notYetAnnotated++
+					}
+				}
+			}
+		} else {
+			// No dependencies, so all not-eligible images are "not yet annotated"
+			notYetAnnotated = notEligible
+		}
+	}
 
 	// Calculate percentages
-	var completedPercent, pendingPercent, filteredPercent float64
+	var completedPercent, pendingPercent, filteredPercent, notYetAnnotatedPercent float64
 	if total > 0 {
 		completedPercent = float64(completed) / float64(total) * 100
 		pendingPercent = float64(pending) / float64(total) * 100
-		filteredPercent = float64(filtered) / float64(total) * 100
+		filteredPercent = float64(filteredWrongClass) / float64(total) * 100
+		notYetAnnotatedPercent = float64(notYetAnnotated) / float64(total) * 100
 	}
 
 	return &PhaseProgress{
-		Completed:        completed,
-		Pending:          pending,
-		Filtered:         filtered,
-		Total:            total,
-		CompletedPercent: completedPercent,
-		PendingPercent:   pendingPercent,
-		FilteredPercent:  filteredPercent,
+		Completed:              completed,
+		Pending:                pending,
+		FilteredWrongClass:     filteredWrongClass,
+		NotYetAnnotated:        notYetAnnotated,
+		Total:                  total,
+		CompletedPercent:       completedPercent,
+		PendingPercent:         pendingPercent,
+		FilteredPercent:        filteredPercent,
+		NotYetAnnotatedPercent: notYetAnnotatedPercent,
 	}, nil
 }
 

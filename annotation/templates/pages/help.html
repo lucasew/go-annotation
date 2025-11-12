@@ -46,11 +46,18 @@
               {{if gt $task.PhaseProgress.PendingPercent 5.0}}{{$task.PhaseProgress.Pending}}{{end}}
             </div>
             {{end}}
-            {{if gt $task.PhaseProgress.Filtered 0}}
+            {{if gt $task.PhaseProgress.NotYetAnnotated 0}}
+            <div class="bg-base-300 flex items-center justify-center text-base-content text-xs transition-all hover:opacity-90"
+                 style="width: {{$task.PhaseProgress.NotYetAnnotatedPercent}}%"
+                 title="{{$task.PhaseProgress.NotYetAnnotated}} not yet annotated in previous phase ({{printf "%.1f" $task.PhaseProgress.NotYetAnnotatedPercent}}%)">
+              {{if gt $task.PhaseProgress.NotYetAnnotatedPercent 5.0}}{{$task.PhaseProgress.NotYetAnnotated}}{{end}}
+            </div>
+            {{end}}
+            {{if gt $task.PhaseProgress.FilteredWrongClass 0}}
             <div class="bg-error flex items-center justify-center text-error-content text-xs transition-all hover:opacity-90"
                  style="width: {{$task.PhaseProgress.FilteredPercent}}%"
-                 title="{{$task.PhaseProgress.Filtered}} not applicable - filtered by previous phase ({{printf "%.1f" $task.PhaseProgress.FilteredPercent}}%)">
-              {{if gt $task.PhaseProgress.FilteredPercent 5.0}}{{$task.PhaseProgress.Filtered}}{{end}}
+                 title="{{$task.PhaseProgress.FilteredWrongClass}} annotated with wrong class in previous phase ({{printf "%.1f" $task.PhaseProgress.FilteredPercent}}%)">
+              {{if gt $task.PhaseProgress.FilteredPercent 5.0}}{{$task.PhaseProgress.FilteredWrongClass}}{{end}}
             </div>
             {{end}}
           </div>
