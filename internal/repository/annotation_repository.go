@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/lucasew/go-annotation/internal/domain"
 	"github.com/lucasew/go-annotation/internal/sqlc"
@@ -103,7 +102,7 @@ func (r *AnnotationRepository) GetByUser(ctx context.Context, username string, l
 				OptionValue: row.OptionValue,
 				AnnotatedAt: row.AnnotatedAt.Time,
 			},
-			ImagePath:            row.Path,
+			ImagePath:             row.Path,
 			ImageOriginalFilename: row.OriginalFilename.String,
 		}
 	}
