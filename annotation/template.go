@@ -1,7 +1,9 @@
 package annotation
 
 import (
+	"bytes"
 	"embed"
+	"fmt"
 	"html/template"
 	"io"
 )
@@ -27,15 +29,38 @@ func init() {
 	}
 }
 
-// RenderPage renders a page using mold with automatic CSS injection
+// RenderPage renders a page using a base layout
 func RenderPage(w io.Writer, pageName string, data map[string]interface{}) error {
-	// Inject CSS automatically
+	// Ensure data map exists
 	if data == nil {
 		data = make(map[string]interface{})
 	}
+
+	// Inject CSS automatically
 	data["CSS"] = template.CSS(cssContent)
 
-	return templateManager.Render(w, "pages/"+pageName, data)
+	// Create a new map for the layout data to avoid polluting the page data
+	layoutData := make(map[string]interface{})
+	for k, v := range data {
+		layoutData[k] = v
+	}
+
+	// First, render the page content itself to a buffer
+	var pageContent bytes.Buffer
+	// We render the page without a layout first.
+	// The "extends" directive is not working, so we manually implement the layout.
+	// The mold engine seems to ignore rendering a template that only has blocks,
+	// so we render the page directly.
+	err := templateManager.Render(&pageContent, "pages/"+pageName, data)
+	if err != nil {
+		return fmt.Errorf("failed to render page content '%s': %w", pageName, err)
+	}
+
+	// Now, add the rendered page content to the layout data under the "content" block name
+	layoutData["content"] = template.HTML(pageContent.String())
+
+	// Finally, render the base layout, which will use the "content" data
+	return templateManager.Render(w, "layouts/base.html", layoutData)
 }
 
 // RenderPageWithTitle is a convenience function to render a page with just a title
