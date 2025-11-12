@@ -26,7 +26,7 @@ func executeCommand(args ...string) (string, string, error) {
 }
 
 func TestRootCmd_SingleArgument(t *testing.T) {
-	t.Run("when argument is a directory, creates config file", func(t *testing.T) {
+	t.Run("when argument is a directory, creates config file and exits", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "config.yaml")
 
@@ -39,9 +39,23 @@ func TestRootCmd_SingleArgument(t *testing.T) {
 			t.Errorf("expected config file to be created at %s, but it wasn't", configPath)
 		}
 
-		// Check for log output indicating creation
 		if !strings.Contains(errOut, "Creating default config") {
 			t.Errorf("expected log output to contain 'Creating default config', but got: %s", errOut)
+		}
+	})
+
+	t.Run("when argument is a directory and config exists, logs message and exits", func(t *testing.T) {
+		tempDir := t.TempDir()
+		configPath := filepath.Join(tempDir, "config.yaml")
+		os.WriteFile(configPath, []byte(""), 0644) // Create dummy config
+
+		_, errOut, err := executeCommand(tempDir)
+		if err != nil {
+			t.Fatalf("command execution failed: %v, output: %s", err, errOut)
+		}
+
+		if !strings.Contains(errOut, "Config file already exists") {
+			t.Errorf("expected log output to contain 'Config file already exists', but got: %s", errOut)
 		}
 	})
 
@@ -68,12 +82,6 @@ tasks:
 		os.WriteFile(configPath, []byte(validConfig), 0644)
 		os.Mkdir(imagesPath, 0755)
 
-		// We expect an error because the server can't actually start in a test env,
-		// but we can check the log output to see if it tried.
-		// The error "listen tcp :8080: bind: address already in use" is a good sign.
-		// Or, if we get a timeout, that's also a sign it tried to start.
-		// For this test, we'll just check that it doesn't fail immediately with a config error.
-		// The most reliable check is for the log output saying it's starting the server.
 		_, errOut, err := executeCommand(configPath, "--database", dbPath, "--images", imagesPath, "--addr", ":8082")
 
 		// We expect an error because the server will be interrupted or fail to bind in test.
@@ -86,7 +94,9 @@ tasks:
 			t.Errorf("should not have prompted for database flag, got: %s", errOut)
 		}
 
-		if !strings.Contains(errOut, "Starting server on: :8082") {
+		// The error might be a bind error if another test is running, which is fine.
+		// The main thing is to check that it *tried* to start.
+		if !strings.Contains(errOut, "Starting server on: :8082") && !strings.Contains(errOut, "bind: address already in use") {
 			t.Errorf("expected log to show server starting, but it didn't. Got: %s", errOut)
 		}
 	})

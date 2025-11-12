@@ -33,38 +33,36 @@ With a set of trivial choices scale the classification of a set of images to man
 
 			// Check if it's a directory
 			if stat, err := os.Stat(arg); err == nil && stat.IsDir() {
-				// It's a folder - initialize it
+				// It's a folder. Check for config, create if needed, then exit.
 				log.Printf("Detected folder argument: %s", arg)
-				log.Printf("Initializing project in folder...")
-
 				configFile = filepath.Join(arg, "config.yaml")
-				databaseFile = filepath.Join(arg, "annotations.db")
-				imagesDir = arg
 
-				// Create config if it doesn't exist
 				if _, err := os.Stat(configFile); os.IsNotExist(err) {
 					log.Printf("Creating default config: %s", configFile)
-					if err := createSampleConfig(configFile, imagesDir); err != nil {
+					if err := createSampleConfig(configFile, arg); err != nil {
 						return fmt.Errorf("failed to create config: %w", err)
 					}
 					log.Printf("✓ Config file created. You can now run 'go-annotation %s' to start the server.", arg)
-					return nil // Exit after creating the config
+				} else {
+					log.Printf("✓ Config file already exists: %s. You can run 'go-annotation %s' to start the server.", configFile, arg)
 				}
-			} else {
-				// Assume it's a config file
-				configFile = arg
-
-				// Require other flags
-				databaseFile, err = cmd.Flags().GetString("database")
-				if err != nil || databaseFile == "" {
-					return fmt.Errorf("when providing a config file, --database flag is required")
-				}
-
-				imagesDir, err = cmd.Flags().GetString("images")
-				if err != nil || imagesDir == "" {
-					return fmt.Errorf("when providing a config file, --images flag is required")
-				}
+				return nil // Always exit after handling a directory argument
 			}
+
+			// It's not a directory, so assume it's a config file
+			configFile = arg
+
+			// Require other flags
+			databaseFile, err = cmd.Flags().GetString("database")
+			if err != nil || databaseFile == "" {
+				return fmt.Errorf("when providing a config file, --database flag is required")
+			}
+
+			imagesDir, err = cmd.Flags().GetString("images")
+			if err != nil || imagesDir == "" {
+				return fmt.Errorf("when providing a config file, --images flag is required")
+			}
+
 		} else {
 			// No positional arg - use flags
 			configFile, err = cmd.Flags().GetString("config")
@@ -82,6 +80,9 @@ With a set of trivial choices scale the classification of a set of images to man
 				return fmt.Errorf("--images flag is required")
 			}
 		}
+
+		// --- Server startup logic (only runs if not a directory) ---
+		log.Printf("Initializing project in folder...")
 
 		// Load config
 		config, err := annotation.LoadConfig(configFile)
@@ -135,7 +136,7 @@ func main() {
 func init() {
 	// Optional flags (only used when not providing a folder argument)
 	rootCmd.Flags().StringP("config", "c", "", "Config file for the annotation")
-	rootCmd.Flags().StringP("database", "d", "", "Database file path")
+	rootCmd.Flags().StringP("database", "d", "annotations.db", "Database file path")
 	rootCmd.Flags().StringP("images", "i", "", "Images directory path")
 	rootCmd.Flags().StringP("addr", "a", ":8080", "Address to bind the webserver")
 }
