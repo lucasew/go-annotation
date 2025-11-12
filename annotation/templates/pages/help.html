@@ -1,8 +1,4 @@
-{{/* extends "layouts/base.html" */}}
-
-{{/* block title */}}{{.Title}}{{/* endblock */}}
-
-{{/* block content */}}
+{{ block "content" . }}
 <div class="breadcrumbs text-sm mb-4">
   <ul>
     <li><a href="/">Home</a></li>
@@ -29,4 +25,4 @@
   {{end}}
 </div>
 {{end}}
-{{/* endblock */}}
+{{ end }}
