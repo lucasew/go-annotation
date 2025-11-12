@@ -99,7 +99,7 @@ func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) 
 	// If there are dependencies, we need to filter images that meet the criteria
 	if len(task.If) > 0 {
 		// Get all candidate images
-		allImages, err := a.imageRepo.ListNotFinished(ctx, 10000) // Large limit
+		allImages, err := a.imageRepo.List(ctx)
 		if err != nil {
 			return 0, fmt.Errorf("while listing images: %w", err)
 		}
@@ -188,8 +188,8 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 
 	task := a.Config.Tasks[stageIndex]
 
-	// Get images without annotation for this stage (using a large limit)
-	allImages, err := a.imageRepo.ListNotFinished(ctx, 10000)
+	// Get images without annotation for this stage
+	allImages, err := a.imageRepo.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("while listing images: %w", err)
 	}
@@ -261,7 +261,7 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 	selectedSHA256 := candidateImages[rand.Intn(len(candidateImages))]
 
 	// Get image details
-	selectedImage, err := a.imageRepo.Get(ctx, selectedSHA256)
+	selectedImage, err := a.imageRepo.GetBySHA256(ctx, selectedSHA256)
 	if err != nil {
 		return nil, fmt.Errorf("while getting image details: %w", err)
 	}
@@ -275,7 +275,7 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 
 func (a *AnnotatorApp) GetImageFilename(ctx context.Context, sha256 string) (filename string, err error) {
 	// Get image from repository using SHA256 hash
-	img, err := a.imageRepo.Get(ctx, sha256)
+	img, err := a.imageRepo.GetBySHA256(ctx, sha256)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("image not found: %s", sha256)

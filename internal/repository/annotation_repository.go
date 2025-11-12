@@ -96,18 +96,15 @@ func (r *AnnotationRepository) GetByUser(ctx context.Context, username string, l
 		ann := domain.AnnotationWithImage{
 			Annotation: domain.Annotation{
 				ID:          row.ID,
-				ImageID:     row.ImageID,
+				ImageSHA256: row.ImageSha256,
 				Username:    row.Username,
 				StageIndex:  int(row.StageIndex),
 				OptionValue: row.OptionValue,
 			},
-			ImagePath: row.Path,
+			ImageFilename: row.Filename,
 		}
 		if row.AnnotatedAt != nil {
 			ann.Annotation.AnnotatedAt = *row.AnnotatedAt
-		}
-		if row.OriginalFilename != nil {
-			ann.ImageOriginalFilename = *row.OriginalFilename
 		}
 		result[i] = &ann
 	}
@@ -205,7 +202,7 @@ func (r *AnnotationRepository) GetStats(ctx context.Context) (*domain.Annotation
 func toDomainAnnotation(ann sqlc.Annotation) *domain.Annotation {
 	d := &domain.Annotation{
 		ID:          ann.ID,
-		ImageID:     ann.ImageID,
+		ImageSHA256: ann.ImageSha256,
 		Username:    ann.Username,
 		StageIndex:  int(ann.StageIndex),
 		OptionValue: ann.OptionValue,

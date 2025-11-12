@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	_ "github.com/mattn/go-sqlite3"
 	"gopkg.in/yaml.v3"
+	_ "modernc.org/sqlite"
 )
 
 // migrateCmd represents the migrate-legacy-db command

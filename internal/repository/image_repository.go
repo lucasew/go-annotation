@@ -42,8 +42,8 @@ func (r *ImageRepository) Create(ctx context.Context, sha256, filename string) (
 	return toDomainImage(img), nil
 }
 
-// Get retrieves an image by its SHA256 hash
-func (r *ImageRepository) Get(ctx context.Context, sha256 string) (*domain.Image, error) {
+// GetBySHA256 retrieves an image by its SHA256 hash
+func (r *ImageRepository) GetBySHA256(ctx context.Context, sha256 string) (*domain.Image, error) {
 	img, err := r.queries.GetImage(ctx, sha256)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -71,21 +71,6 @@ func (r *ImageRepository) GetByFilename(ctx context.Context, filename string) (*
 // List retrieves all images
 func (r *ImageRepository) List(ctx context.Context) ([]*domain.Image, error) {
 	images, err := r.queries.ListImages(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]*domain.Image, len(images))
-	for i, img := range images {
-		result[i] = toDomainImage(img)
-	}
-
-	return result, nil
-}
-
-// ListNotFinished retrieves images that haven't been fully annotated
-func (r *ImageRepository) ListNotFinished(ctx context.Context, limit int) ([]*domain.Image, error) {
-	images, err := r.queries.ListImagesNotFinished(ctx, int64(limit))
 	if err != nil {
 		return nil, err
 	}
