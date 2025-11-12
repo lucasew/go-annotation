@@ -3,6 +3,7 @@ module github.com/lucasew/go-annotation
 go 1.24.0
 
 require (
+	github.com/abiosoft/mold v0.0.0-20250328135240-0a4c28cb836a
 	github.com/davecgh/go-spew v1.1.1
 	github.com/google/uuid v1.6.0
 	github.com/russross/blackfriday v1.6.0
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	github.com/abiosoft/mold v0.0.0-20250328135240-0a4c28cb836a // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
