@@ -20,94 +20,62 @@ func (q *Queries) CountImages(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const countPendingImages = `-- name: CountPendingImages :one
-SELECT COUNT(*) FROM images
-WHERE is_finished = FALSE
-`
-
-func (q *Queries) CountPendingImages(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countPendingImages)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createImage = `-- name: CreateImage :one
-INSERT INTO images (path, original_filename)
+INSERT INTO images (sha256, filename)
 VALUES (?, ?)
-RETURNING id, path, original_filename, ingested_at, completed_stages, is_finished
+ON CONFLICT(sha256) DO UPDATE SET filename = excluded.filename
+RETURNING sha256, filename, ingested_at
 `
 
 type CreateImageParams struct {
-	Path             string  `json:"path"`
-	OriginalFilename *string `json:"original_filename"`
+	Sha256   string `json:"sha256"`
+	Filename string `json:"filename"`
 }
 
 func (q *Queries) CreateImage(ctx context.Context, arg CreateImageParams) (Image, error) {
-	row := q.db.QueryRowContext(ctx, createImage, arg.Path, arg.OriginalFilename)
+	row := q.db.QueryRowContext(ctx, createImage, arg.Sha256, arg.Filename)
 	var i Image
-	err := row.Scan(
-		&i.ID,
-		&i.Path,
-		&i.OriginalFilename,
-		&i.IngestedAt,
-		&i.CompletedStages,
-		&i.IsFinished,
-	)
+	err := row.Scan(&i.Sha256, &i.Filename, &i.IngestedAt)
 	return i, err
 }
 
 const deleteImage = `-- name: DeleteImage :exec
 DELETE FROM images
-WHERE id = ?
+WHERE sha256 = ?
 `
 
-func (q *Queries) DeleteImage(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteImage, id)
+func (q *Queries) DeleteImage(ctx context.Context, sha256 string) error {
+	_, err := q.db.ExecContext(ctx, deleteImage, sha256)
 	return err
 }
 
 const getImage = `-- name: GetImage :one
-SELECT id, path, original_filename, ingested_at, completed_stages, is_finished FROM images
-WHERE id = ?
+SELECT sha256, filename, ingested_at FROM images
+WHERE sha256 = ?
 `
 
-func (q *Queries) GetImage(ctx context.Context, id int64) (Image, error) {
-	row := q.db.QueryRowContext(ctx, getImage, id)
+func (q *Queries) GetImage(ctx context.Context, sha256 string) (Image, error) {
+	row := q.db.QueryRowContext(ctx, getImage, sha256)
 	var i Image
-	err := row.Scan(
-		&i.ID,
-		&i.Path,
-		&i.OriginalFilename,
-		&i.IngestedAt,
-		&i.CompletedStages,
-		&i.IsFinished,
-	)
+	err := row.Scan(&i.Sha256, &i.Filename, &i.IngestedAt)
 	return i, err
 }
 
-const getImageByPath = `-- name: GetImageByPath :one
-SELECT id, path, original_filename, ingested_at, completed_stages, is_finished FROM images
-WHERE path = ?
+const getImageByFilename = `-- name: GetImageByFilename :one
+SELECT sha256, filename, ingested_at FROM images
+WHERE filename = ?
 `
 
-func (q *Queries) GetImageByPath(ctx context.Context, path string) (Image, error) {
-	row := q.db.QueryRowContext(ctx, getImageByPath, path)
+func (q *Queries) GetImageByFilename(ctx context.Context, filename string) (Image, error) {
+	row := q.db.QueryRowContext(ctx, getImageByFilename, filename)
 	var i Image
-	err := row.Scan(
-		&i.ID,
-		&i.Path,
-		&i.OriginalFilename,
-		&i.IngestedAt,
-		&i.CompletedStages,
-		&i.IsFinished,
-	)
+	err := row.Scan(&i.Sha256, &i.Filename, &i.IngestedAt)
 	return i, err
 }
 
 const listImages = `-- name: ListImages :many
-SELECT id, path, original_filename, ingested_at, completed_stages, is_finished FROM images
-ORDER BY id
+SELECT sha256, filename, ingested_at FROM images
+ORDER BY filename
 `
 
 func (q *Queries) ListImages(ctx context.Context) ([]Image, error) {
@@ -119,14 +87,7 @@ func (q *Queries) ListImages(ctx context.Context) ([]Image, error) {
 	items := []Image{}
 	for rows.Next() {
 		var i Image
-		if err := rows.Scan(
-			&i.ID,
-			&i.Path,
-			&i.OriginalFilename,
-			&i.IngestedAt,
-			&i.CompletedStages,
-			&i.IsFinished,
-		); err != nil {
+		if err := rows.Scan(&i.Sha256, &i.Filename, &i.IngestedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -141,9 +102,8 @@ func (q *Queries) ListImages(ctx context.Context) ([]Image, error) {
 }
 
 const listImagesNotFinished = `-- name: ListImagesNotFinished :many
-SELECT id, path, original_filename, ingested_at, completed_stages, is_finished FROM images
-WHERE is_finished = FALSE
-ORDER BY completed_stages ASC, id ASC
+SELECT sha256, filename, ingested_at FROM images
+ORDER BY filename ASC
 LIMIT ?
 `
 
@@ -156,14 +116,7 @@ func (q *Queries) ListImagesNotFinished(ctx context.Context, limit int64) ([]Ima
 	items := []Image{}
 	for rows.Next() {
 		var i Image
-		if err := rows.Scan(
-			&i.ID,
-			&i.Path,
-			&i.OriginalFilename,
-			&i.IngestedAt,
-			&i.CompletedStages,
-			&i.IsFinished,
-		); err != nil {
+		if err := rows.Scan(&i.Sha256, &i.Filename, &i.IngestedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -175,22 +128,4 @@ func (q *Queries) ListImagesNotFinished(ctx context.Context, limit int64) ([]Ima
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateImageCompletionStatus = `-- name: UpdateImageCompletionStatus :exec
-UPDATE images
-SET completed_stages = ?,
-    is_finished = ?
-WHERE id = ?
-`
-
-type UpdateImageCompletionStatusParams struct {
-	CompletedStages *int64 `json:"completed_stages"`
-	IsFinished      *bool  `json:"is_finished"`
-	ID              int64  `json:"id"`
-}
-
-func (q *Queries) UpdateImageCompletionStatus(ctx context.Context, arg UpdateImageCompletionStatusParams) error {
-	_, err := q.db.ExecContext(ctx, updateImageCompletionStatus, arg.CompletedStages, arg.IsFinished, arg.ID)
-	return err
 }

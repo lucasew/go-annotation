@@ -1,39 +1,29 @@
 -- name: CreateImage :one
-INSERT INTO images (path, original_filename)
+INSERT INTO images (sha256, filename)
 VALUES (?, ?)
+ON CONFLICT(sha256) DO UPDATE SET filename = excluded.filename
 RETURNING *;
 
 -- name: GetImage :one
 SELECT * FROM images
-WHERE id = ?;
+WHERE sha256 = ?;
 
--- name: GetImageByPath :one
+-- name: GetImageByFilename :one
 SELECT * FROM images
-WHERE path = ?;
+WHERE filename = ?;
 
 -- name: ListImages :many
 SELECT * FROM images
-ORDER BY id;
+ORDER BY filename;
 
 -- name: ListImagesNotFinished :many
 SELECT * FROM images
-WHERE is_finished = FALSE
-ORDER BY completed_stages ASC, id ASC
+ORDER BY filename ASC
 LIMIT ?;
-
--- name: UpdateImageCompletionStatus :exec
-UPDATE images
-SET completed_stages = ?,
-    is_finished = ?
-WHERE id = ?;
 
 -- name: CountImages :one
 SELECT COUNT(*) FROM images;
 
--- name: CountPendingImages :one
-SELECT COUNT(*) FROM images
-WHERE is_finished = FALSE;
-
 -- name: DeleteImage :exec
 DELETE FROM images
-WHERE id = ?;
+WHERE sha256 = ?;

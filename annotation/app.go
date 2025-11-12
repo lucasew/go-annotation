@@ -124,13 +124,12 @@ func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) 
 				// Check if this image has the required annotation value for the dependency
 				hasValidAnnotation := false
 				// We need to check if ANY user has annotated this image with the required value
-				// For simplicity, we'll use GetImageIDsWithAnnotation
-				imageIDs, err := a.annotationRepo.GetImageIDsWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+				imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
 				if err != nil {
 					return 0, fmt.Errorf("while checking dependency: %w", err)
 				}
-				for _, id := range imageIDs {
-					if id == img.ID {
+				for _, hash := range imageHashes {
+					if hash == img.SHA256 {
 						hasValidAnnotation = true
 						break
 					}
@@ -144,7 +143,7 @@ func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) 
 
 			if valid {
 				// Check if this image has annotation for current stage
-				hasAnnotation, err := a.annotationRepo.CheckAnnotationExists(ctx, img.ID, "", int64(stageIndex))
+				hasAnnotation, err := a.annotationRepo.CheckAnnotationExists(ctx, img.SHA256, "", int64(stageIndex))
 				if err != nil {
 					return 0, err
 				}
@@ -196,10 +195,10 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 	}
 
 	// Filter images based on dependencies and annotation status
-	var candidateImages []int64
+	var candidateImages []string
 	for _, img := range allImages {
 		// Check if image already has annotation for this stage
-		hasAnnotation, err := a.annotationRepo.CheckAnnotationExists(ctx, img.ID, "", int64(stageIndex))
+		hasAnnotation, err := a.annotationRepo.CheckAnnotationExists(ctx, img.SHA256, "", int64(stageIndex))
 		if err != nil {
 			return nil, err
 		}
@@ -224,14 +223,14 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 				}
 
 				// Check if this image has the required annotation value for the dependency
-				imageIDs, err := a.annotationRepo.GetImageIDsWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+				imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
 				if err != nil {
 					return nil, fmt.Errorf("while checking dependency: %w", err)
 				}
 
 				hasValidAnnotation := false
-				for _, id := range imageIDs {
-					if id == img.ID {
+				for _, hash := range imageHashes {
+					if hash == img.SHA256 {
 						hasValidAnnotation = true
 						break
 					}
@@ -245,7 +244,7 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		}
 
 		if valid {
-			candidateImages = append(candidateImages, img.ID)
+			candidateImages = append(candidateImages, img.SHA256)
 			// Limit candidates to OffsetAdvance for performance
 			if len(candidateImages) >= a.OffsetAdvance {
 				break
@@ -258,40 +257,33 @@ func (a *AnnotatorApp) NextAnnotationStep(ctx context.Context, taskID string) (*
 		return nil, nil
 	}
 
-	// Randomly select one image
-	selectedImageID := candidateImages[rand.Intn(len(candidateImages))]
+	// Randomly select one image SHA256
+	selectedSHA256 := candidateImages[rand.Intn(len(candidateImages))]
 
 	// Get image details
-	selectedImage, err := a.imageRepo.Get(ctx, selectedImageID)
+	selectedImage, err := a.imageRepo.Get(ctx, selectedSHA256)
 	if err != nil {
 		return nil, fmt.Errorf("while getting image details: %w", err)
 	}
 
 	return &AnnotationStep{
 		TaskID:    taskID,
-		ImageID:   fmt.Sprintf("%d", selectedImageID),
-		ImageName: selectedImage.Path,
+		ImageID:   selectedSHA256,
+		ImageName: selectedImage.Filename,
 	}, nil
 }
 
-func (a *AnnotatorApp) GetImagePath(ctx context.Context, imageID string) (imagePath string, err error) {
-	// Convert image ID from string to int64
-	var id int64
-	_, err = fmt.Sscanf(imageID, "%d", &id)
-	if err != nil {
-		return "", fmt.Errorf("invalid image ID: %w", err)
-	}
-
-	// Get image from repository
-	img, err := a.imageRepo.Get(ctx, id)
+func (a *AnnotatorApp) GetImageFilename(ctx context.Context, sha256 string) (filename string, err error) {
+	// Get image from repository using SHA256 hash
+	img, err := a.imageRepo.Get(ctx, sha256)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "", fmt.Errorf("image not found: %s", imageID)
+			return "", fmt.Errorf("image not found: %s", sha256)
 		}
 		return "", err
 	}
 
-	return img.Path, nil
+	return img.Filename, nil
 }
 
 type AnnotationResponse struct {
@@ -315,15 +307,8 @@ func (a *AnnotatorApp) SubmitAnnotation(ctx context.Context, annotation Annotati
 		return fmt.Errorf("no such task: %s", annotation.TaskID)
 	}
 
-	// Convert image ID from string to int64
-	var imageID int64
-	_, err := fmt.Sscanf(annotation.ImageID, "%d", &imageID)
-	if err != nil {
-		return fmt.Errorf("invalid image ID: %w", err)
-	}
-
-	// Create or update annotation using repository
-	_, err = a.annotationRepo.Create(ctx, imageID, annotation.User, stageIndex, annotation.Value)
+	// ImageID is already the SHA256 hash, use it directly
+	_, err := a.annotationRepo.Create(ctx, annotation.ImageID, annotation.User, stageIndex, annotation.Value)
 	if err != nil {
 		return fmt.Errorf("while creating annotation: %w", err)
 	}
@@ -476,7 +461,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
-		imagePath, _ := a.GetImagePath(r.Context(), imageID)
+		imageFilename, _ := a.GetImageFilename(r.Context(), imageID)
 
 		if r.Method == http.MethodPost {
 			log.Printf("POST")
@@ -555,7 +540,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			"TaskID":        taskID,
 			"TaskName":      task.Name,
 			"ImageID":       imageID,
-			"ImageFilename": imagePath,
+			"ImageFilename": imageFilename,
 			"Classes":       classes,
 		}
 
@@ -566,26 +551,26 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		}
 	})
 
-	// Asset handler
+	// Asset handler - serves images by SHA256 hash
 	mux.HandleFunc("/asset/", func(w http.ResponseWriter, r *http.Request) {
 		itemPath := pathParts(r.URL.Path)
 		if len(itemPath) != 2 {
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
-		imageID := itemPath[1]
-		log.Printf("http: fetching asset id %s", imageID)
+		sha256 := itemPath[1]
+		log.Printf("http: fetching asset %s", sha256)
 
-		// Get image path from repository
-		imagePath, err := a.GetImagePath(r.Context(), imageID)
+		// Get image filename from repository
+		filename, err := a.GetImageFilename(r.Context(), sha256)
 		if err != nil {
-			log.Printf("http: asset id %s was not found: %s", imageID, err)
+			log.Printf("http: asset %s was not found: %s", sha256, err)
 			http.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
 
-		log.Printf("http: asset id %s is %s!", imageID, imagePath)
-		fullPath := path.Join(a.ImagesDir, imagePath)
+		log.Printf("http: asset %s is %s!", sha256, filename)
+		fullPath := path.Join(a.ImagesDir, filename)
 		f, err := os.Open(fullPath)
 		if errors.Is(err, os.ErrNotExist) {
 			http.NotFoundHandler().ServeHTTP(w, r)
@@ -639,31 +624,27 @@ func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
 	// Run the migration SQL to create the new schema
 	migrationSQL := `
 -- Images table stores information about images to be annotated
+-- Uses SHA256 hash as primary key for content-based addressing
 CREATE TABLE IF NOT EXISTS images (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  path TEXT UNIQUE NOT NULL,
-  original_filename TEXT,
-  ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  completed_stages INTEGER DEFAULT 0,
-  is_finished BOOLEAN DEFAULT FALSE
+  sha256 TEXT PRIMARY KEY,
+  filename TEXT NOT NULL,
+  ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_images_is_finished ON images(is_finished);
-CREATE INDEX IF NOT EXISTS idx_images_completed_stages ON images(completed_stages);
-
 -- Annotations table stores all annotations
+-- Uses username directly from YAML config (no FK to users table)
 CREATE TABLE IF NOT EXISTS annotations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  image_id INTEGER NOT NULL,
+  image_sha256 TEXT NOT NULL,
   username TEXT NOT NULL,
   stage_index INTEGER NOT NULL,
   option_value TEXT NOT NULL,
   annotated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(image_id, username, stage_index),
-  FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+  UNIQUE(image_sha256, username, stage_index),
+  FOREIGN KEY(image_sha256) REFERENCES images(sha256) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_annotations_image_id ON annotations(image_id);
+CREATE INDEX IF NOT EXISTS idx_annotations_image_sha256 ON annotations(image_sha256);
 CREATE INDEX IF NOT EXISTS idx_annotations_username ON annotations(username);
 CREATE INDEX IF NOT EXISTS idx_annotations_stage ON annotations(stage_index);
 	`
@@ -693,22 +674,18 @@ CREATE INDEX IF NOT EXISTS idx_annotations_stage ON annotations(stage_index);
 			return fmt.Errorf("while checking if item '%s' is an image: %w", fullPath, err)
 		}
 
-		// Get relative path from images directory
-		relPath, err := filepath.Rel(a.ImagesDir, fullPath)
+		// Hash the file to get SHA256
+		fileHash, err := HashFile(fullPath)
 		if err != nil {
-			relPath = fullPath
+			return fmt.Errorf("while hashing image '%s': %w", fullPath, err)
 		}
 
-		// Use repository to create image (with upsert behavior)
-		_, err = a.imageRepo.GetByPath(ctx, relPath)
-		if err == sql.ErrNoRows || err != nil {
-			// Image doesn't exist, create it
-			_, err = a.imageRepo.Create(ctx, relPath, info.Name())
-			if err != nil {
-				// Ignore duplicate errors (path already exists)
-				if !strings.Contains(err.Error(), "UNIQUE constraint") {
-					return fmt.Errorf("while inserting image '%s': %w", fullPath, err)
-				}
+		// Use repository to create image (with upsert behavior via ON CONFLICT)
+		_, err = a.imageRepo.Create(ctx, fileHash, info.Name())
+		if err != nil {
+			// Ignore duplicate errors (hash already exists)
+			if !strings.Contains(err.Error(), "UNIQUE constraint") {
+				return fmt.Errorf("while inserting image '%s': %w", fullPath, err)
 			}
 		}
 

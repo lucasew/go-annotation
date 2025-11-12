@@ -28,12 +28,10 @@ func NewImageRepositoryWithTx(tx *sql.Tx) *ImageRepository {
 }
 
 // Create creates a new image record
-func (r *ImageRepository) Create(ctx context.Context, path, originalFilename string) (*domain.Image, error) {
+func (r *ImageRepository) Create(ctx context.Context, sha256, filename string) (*domain.Image, error) {
 	params := sqlc.CreateImageParams{
-		Path: path,
-	}
-	if originalFilename != "" {
-		params.OriginalFilename = &originalFilename
+		Sha256:   sha256,
+		Filename: filename,
 	}
 
 	img, err := r.queries.CreateImage(ctx, params)
@@ -44,9 +42,9 @@ func (r *ImageRepository) Create(ctx context.Context, path, originalFilename str
 	return toDomainImage(img), nil
 }
 
-// GetByID retrieves an image by its ID
-func (r *ImageRepository) GetByID(ctx context.Context, id int64) (*domain.Image, error) {
-	img, err := r.queries.GetImage(ctx, id)
+// Get retrieves an image by its SHA256 hash
+func (r *ImageRepository) Get(ctx context.Context, sha256 string) (*domain.Image, error) {
+	img, err := r.queries.GetImage(ctx, sha256)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -57,9 +55,9 @@ func (r *ImageRepository) GetByID(ctx context.Context, id int64) (*domain.Image,
 	return toDomainImage(img), nil
 }
 
-// GetByPath retrieves an image by its path
-func (r *ImageRepository) GetByPath(ctx context.Context, path string) (*domain.Image, error) {
-	img, err := r.queries.GetImageByPath(ctx, path)
+// GetByFilename retrieves an image by its filename
+func (r *ImageRepository) GetByFilename(ctx context.Context, filename string) (*domain.Image, error) {
+	img, err := r.queries.GetImageByFilename(ctx, filename)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -100,50 +98,24 @@ func (r *ImageRepository) ListNotFinished(ctx context.Context, limit int) ([]*do
 	return result, nil
 }
 
-// UpdateCompletionStatus updates the completion status of an image
-func (r *ImageRepository) UpdateCompletionStatus(ctx context.Context, id int64, completedStages int, isFinished bool) error {
-	cs := int64(completedStages)
-	params := sqlc.UpdateImageCompletionStatusParams{
-		ID:              id,
-		CompletedStages: &cs,
-		IsFinished:      &isFinished,
-	}
-
-	return r.queries.UpdateImageCompletionStatus(ctx, params)
-}
-
 // Count returns the total number of images
 func (r *ImageRepository) Count(ctx context.Context) (int64, error) {
 	return r.queries.CountImages(ctx)
 }
 
-// CountPending returns the number of images not yet finished
-func (r *ImageRepository) CountPending(ctx context.Context) (int64, error) {
-	return r.queries.CountPendingImages(ctx)
-}
-
-// Delete removes an image by ID
-func (r *ImageRepository) Delete(ctx context.Context, id int64) error {
-	return r.queries.DeleteImage(ctx, id)
+// Delete removes an image by SHA256 hash
+func (r *ImageRepository) Delete(ctx context.Context, sha256 string) error {
+	return r.queries.DeleteImage(ctx, sha256)
 }
 
 // toDomainImage converts a sqlc.Image to domain.Image
 func toDomainImage(img sqlc.Image) *domain.Image {
 	d := &domain.Image{
-		ID:   img.ID,
-		Path: img.Path,
-	}
-	if img.OriginalFilename != nil {
-		d.OriginalFilename = *img.OriginalFilename
+		SHA256:   img.Sha256,
+		Filename: img.Filename,
 	}
 	if img.IngestedAt != nil {
 		d.IngestedAt = *img.IngestedAt
-	}
-	if img.CompletedStages != nil {
-		d.CompletedStages = int(*img.CompletedStages)
-	}
-	if img.IsFinished != nil {
-		d.IsFinished = *img.IsFinished
 	}
 	return d
 }

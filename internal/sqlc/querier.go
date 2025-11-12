@@ -13,25 +13,23 @@ type Querier interface {
 	CountAnnotationsByUser(ctx context.Context, username string) (int64, error)
 	CountImages(ctx context.Context) (int64, error)
 	CountImagesWithoutAnnotationForStage(ctx context.Context, stageIndex int64) (int64, error)
-	CountPendingImages(ctx context.Context) (int64, error)
 	CountPendingImagesForUserAndStage(ctx context.Context, arg CountPendingImagesForUserAndStageParams) (int64, error)
 	CreateAnnotation(ctx context.Context, arg CreateAnnotationParams) (Annotation, error)
 	CreateImage(ctx context.Context, arg CreateImageParams) (Image, error)
 	DeleteAnnotation(ctx context.Context, id int64) error
-	DeleteAnnotationsForImage(ctx context.Context, imageID int64) error
-	DeleteImage(ctx context.Context, id int64) error
+	DeleteAnnotationsForImage(ctx context.Context, imageSha256 string) error
+	DeleteImage(ctx context.Context, sha256 string) error
 	GetAnnotation(ctx context.Context, arg GetAnnotationParams) (Annotation, error)
 	GetAnnotationStats(ctx context.Context) (GetAnnotationStatsRow, error)
 	GetAnnotationsByImageAndUser(ctx context.Context, arg GetAnnotationsByImageAndUserParams) ([]Annotation, error)
 	GetAnnotationsByUser(ctx context.Context, arg GetAnnotationsByUserParams) ([]GetAnnotationsByUserRow, error)
-	GetAnnotationsForImage(ctx context.Context, imageID int64) ([]Annotation, error)
-	GetImage(ctx context.Context, id int64) (Image, error)
-	GetImageByPath(ctx context.Context, path string) (Image, error)
-	GetImageIDsWithAnnotation(ctx context.Context, arg GetImageIDsWithAnnotationParams) ([]int64, error)
+	GetAnnotationsForImage(ctx context.Context, imageSha256 string) ([]Annotation, error)
+	GetImage(ctx context.Context, sha256 string) (Image, error)
+	GetImageByFilename(ctx context.Context, filename string) (Image, error)
+	GetImageHashesWithAnnotation(ctx context.Context, arg GetImageHashesWithAnnotationParams) ([]string, error)
 	ListImages(ctx context.Context) ([]Image, error)
 	ListImagesNotFinished(ctx context.Context, limit int64) ([]Image, error)
 	ListPendingImagesForUserAndStage(ctx context.Context, arg ListPendingImagesForUserAndStageParams) ([]Image, error)
-	UpdateImageCompletionStatus(ctx context.Context, arg UpdateImageCompletionStatusParams) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -10,7 +10,7 @@ import (
 
 type Annotation struct {
 	ID          int64      `json:"id"`
-	ImageID     int64      `json:"image_id"`
+	ImageSha256 string     `json:"image_sha256"`
 	Username    string     `json:"username"`
 	StageIndex  int64      `json:"stage_index"`
 	OptionValue string     `json:"option_value"`
@@ -18,10 +18,7 @@ type Annotation struct {
 }
 
 type Image struct {
-	ID               int64      `json:"id"`
-	Path             string     `json:"path"`
-	OriginalFilename *string    `json:"original_filename"`
-	IngestedAt       *time.Time `json:"ingested_at"`
-	CompletedStages  *int64     `json:"completed_stages"`
-	IsFinished       *bool      `json:"is_finished"`
+	Sha256     string     `json:"sha256"`
+	Filename   string     `json:"filename"`
+	IngestedAt *time.Time `json:"ingested_at"`
 }

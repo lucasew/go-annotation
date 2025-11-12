@@ -28,9 +28,9 @@ func NewAnnotationRepositoryWithTx(tx *sql.Tx) *AnnotationRepository {
 }
 
 // Create creates or updates an annotation (upsert)
-func (r *AnnotationRepository) Create(ctx context.Context, imageID int64, username string, stageIndex int, optionValue string) (*domain.Annotation, error) {
+func (r *AnnotationRepository) Create(ctx context.Context, imageSHA256 string, username string, stageIndex int, optionValue string) (*domain.Annotation, error) {
 	params := sqlc.CreateAnnotationParams{
-		ImageID:     imageID,
+		ImageSha256: imageSHA256,
 		Username:    username,
 		StageIndex:  int64(stageIndex),
 		OptionValue: optionValue,
@@ -45,11 +45,11 @@ func (r *AnnotationRepository) Create(ctx context.Context, imageID int64, userna
 }
 
 // Get retrieves a specific annotation
-func (r *AnnotationRepository) Get(ctx context.Context, imageID int64, username string, stageIndex int) (*domain.Annotation, error) {
+func (r *AnnotationRepository) Get(ctx context.Context, imageSHA256 string, username string, stageIndex int) (*domain.Annotation, error) {
 	params := sqlc.GetAnnotationParams{
-		ImageID:    imageID,
-		Username:   username,
-		StageIndex: int64(stageIndex),
+		ImageSha256: imageSHA256,
+		Username:    username,
+		StageIndex:  int64(stageIndex),
 	}
 
 	ann, err := r.queries.GetAnnotation(ctx, params)
@@ -64,8 +64,8 @@ func (r *AnnotationRepository) Get(ctx context.Context, imageID int64, username 
 }
 
 // GetForImage retrieves all annotations for a specific image
-func (r *AnnotationRepository) GetForImage(ctx context.Context, imageID int64) ([]*domain.Annotation, error) {
-	anns, err := r.queries.GetAnnotationsForImage(ctx, imageID)
+func (r *AnnotationRepository) GetForImage(ctx context.Context, imageSHA256 string) ([]*domain.Annotation, error) {
+	anns, err := r.queries.GetAnnotationsForImage(ctx, imageSHA256)
 	if err != nil {
 		return nil, err
 	}
@@ -116,10 +116,10 @@ func (r *AnnotationRepository) GetByUser(ctx context.Context, username string, l
 }
 
 // GetByImageAndUser retrieves all annotations for an image by a specific user
-func (r *AnnotationRepository) GetByImageAndUser(ctx context.Context, imageID int64, username string) ([]*domain.Annotation, error) {
+func (r *AnnotationRepository) GetByImageAndUser(ctx context.Context, imageSHA256 string, username string) ([]*domain.Annotation, error) {
 	params := sqlc.GetAnnotationsByImageAndUserParams{
-		ImageID:  imageID,
-		Username: username,
+		ImageSha256: imageSHA256,
+		Username:    username,
 	}
 
 	anns, err := r.queries.GetAnnotationsByImageAndUser(ctx, params)
@@ -162,11 +162,11 @@ func (r *AnnotationRepository) ListPendingImagesForUserAndStage(ctx context.Cont
 }
 
 // Exists checks if an annotation exists
-func (r *AnnotationRepository) Exists(ctx context.Context, imageID int64, username string, stageIndex int) (bool, error) {
+func (r *AnnotationRepository) Exists(ctx context.Context, imageSHA256 string, username string, stageIndex int) (bool, error) {
 	params := sqlc.CheckAnnotationExistsParams{
-		ImageID:    imageID,
-		Username:   username,
-		StageIndex: int64(stageIndex),
+		ImageSha256: imageSHA256,
+		Username:    username,
+		StageIndex:  int64(stageIndex),
 	}
 
 	// The generated CheckAnnotationExists returns int64 (0 or 1 for SQLite)
@@ -183,8 +183,8 @@ func (r *AnnotationRepository) Delete(ctx context.Context, id int64) error {
 }
 
 // DeleteForImage removes all annotations for an image
-func (r *AnnotationRepository) DeleteForImage(ctx context.Context, imageID int64) error {
-	return r.queries.DeleteAnnotationsForImage(ctx, imageID)
+func (r *AnnotationRepository) DeleteForImage(ctx context.Context, imageSHA256 string) error {
+	return r.queries.DeleteAnnotationsForImage(ctx, imageSHA256)
 }
 
 // GetStats returns overall annotation statistics
@@ -221,13 +221,13 @@ func (r *AnnotationRepository) CountImagesWithoutAnnotationForStage(ctx context.
 	return r.queries.CountImagesWithoutAnnotationForStage(ctx, stageIndex)
 }
 
-// GetImageIDsWithAnnotation returns image IDs that have a specific annotation value for a stage
-func (r *AnnotationRepository) GetImageIDsWithAnnotation(ctx context.Context, stageIndex int64, optionValue string) ([]int64, error) {
-	params := sqlc.GetImageIDsWithAnnotationParams{
+// GetImageHashesWithAnnotation returns image SHA256 hashes that have a specific annotation value for a stage
+func (r *AnnotationRepository) GetImageHashesWithAnnotation(ctx context.Context, stageIndex int64, optionValue string) ([]string, error) {
+	params := sqlc.GetImageHashesWithAnnotationParams{
 		StageIndex:  stageIndex,
 		OptionValue: optionValue,
 	}
-	return r.queries.GetImageIDsWithAnnotation(ctx, params)
+	return r.queries.GetImageHashesWithAnnotation(ctx, params)
 }
 
 // CountPendingImagesForUserAndStage counts images needing annotation by a user for a specific stage
@@ -240,10 +240,10 @@ func (r *AnnotationRepository) CountPendingImagesForUserAndStage(ctx context.Con
 }
 
 // CheckAnnotationExists checks if any annotation exists for an image at a stage (any user)
-func (r *AnnotationRepository) CheckAnnotationExists(ctx context.Context, imageID int64, username string, stageIndex int64) (bool, error) {
+func (r *AnnotationRepository) CheckAnnotationExists(ctx context.Context, imageSHA256 string, username string, stageIndex int64) (bool, error) {
 	// If username is empty, check if any annotation exists for this image+stage
 	if username == "" {
-		anns, err := r.queries.GetAnnotationsForImage(ctx, imageID)
+		anns, err := r.queries.GetAnnotationsForImage(ctx, imageSHA256)
 		if err != nil {
 			return false, err
 		}
@@ -255,7 +255,7 @@ func (r *AnnotationRepository) CheckAnnotationExists(ctx context.Context, imageI
 		return false, nil
 	}
 	// Otherwise use the specific user check
-	return r.Exists(ctx, imageID, username, int(stageIndex))
+	return r.Exists(ctx, imageSHA256, username, int(stageIndex))
 }
 
 // Verify that AnnotationRepository implements domain.AnnotationRepository
