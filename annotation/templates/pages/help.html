@@ -45,23 +45,26 @@
 
   <h2>{{i "Description"}}</h2>
   {{if .Description}}
-  <blockquote>{{markdown .Description}}</blockquote>
+  <div>{{markdown .Description}}</div>
   {{else}}
-  <blockquote>{{i "(No description provided)"}}</blockquote>
+  <p class="text-base-content/70">{{i "(No description provided)"}}</p>
   {{end}}
 
   {{if .Task}}
   <!-- Detail view for specific task -->
   <h2>{{i "Phase"}}: {{.Task.ShortName}}</h2>
-  <blockquote>{{markdown .Task.Name}}</blockquote>
+  <div>{{markdown .Task.Name}}</div>
 
   <h3>{{i "Possible choices"}}</h3>
   {{range $classID, $class := .Task.Classes}}
-  <h4>{{if $class.Name}}{{$class.Name}}{{else}}{{i "(No name)"}}{{end}} ({{$classID}})</h4>
+  <h4 class="flex items-center gap-2">
+    <span>{{if $class.Name}}{{$class.Name}}{{else}}{{i "(No name)"}}{{end}}</span>
+    <span class="badge badge-outline badge-sm not-prose">{{$classID}}</span>
+  </h4>
   {{if $class.Description}}
-  <blockquote>{{markdown $class.Description}}</blockquote>
+  <div>{{markdown $class.Description}}</div>
   {{else}}
-  <blockquote>{{i "(No description provided)"}}</blockquote>
+  <p class="text-base-content/70">{{i "(No description provided)"}}</p>
   {{end}}
 
   {{if $class.Examples}}
