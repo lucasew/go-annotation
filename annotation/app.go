@@ -74,6 +74,7 @@ type TaskWithCount struct {
 	AvailableCount int
 	TotalCount     int
 	CompletedCount int
+	PhaseProgress  *PhaseProgress
 }
 
 type PhaseProgress struct {
@@ -523,11 +524,19 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 					completedCount = 0
 				}
 
+				// Get comprehensive phase progress stats
+				phaseProgress, err := a.GetPhaseProgressStats(r.Context(), task.ID)
+				if err != nil {
+					log.Printf("error getting phase progress for task %s: %s", task.ID, err)
+					phaseProgress = &PhaseProgress{}
+				}
+
 				tasks = append(tasks, TaskWithCount{
 					ConfigTask:     task,
 					AvailableCount: availableCount,
 					TotalCount:     totalEligible,
 					CompletedCount: completedCount,
+					PhaseProgress:  phaseProgress,
 				})
 			}
 		} else if len(itemPath) == 2 {
