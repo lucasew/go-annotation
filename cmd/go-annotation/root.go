@@ -1,23 +1,21 @@
 /*
 Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-
 */
-package cmd
+package main
 
 import (
+	"log"
 	"os"
-    "strings"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
-
-
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "go-annotation",
 	Short: "Quickly make image annotations",
-    Long: strings.TrimSpace(`
+	Long: strings.TrimSpace(`
 With a set of trivial choices scale the classification of a set of images to many people to build datasets to train classifiers.
     `),
 	// Uncomment the following line if your bare application
@@ -25,11 +23,10 @@ With a set of trivial choices scale the classification of a set of images to man
 	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
+func main() {
 	err := rootCmd.Execute()
 	if err != nil {
+		log.Fatalf("Error executing command: %v", err)
 		os.Exit(1)
 	}
 }
@@ -45,5 +42,3 @@ func init() {
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
-
-
