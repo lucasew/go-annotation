@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/lucasew/go-annotation/internal/domain"
 	"github.com/lucasew/go-annotation/internal/sqlc"
@@ -93,18 +94,23 @@ func (r *AnnotationRepository) GetByUser(ctx context.Context, username string, l
 
 	result := make([]*domain.AnnotationWithImage, len(rows))
 	for i, row := range rows {
-		result[i] = &domain.AnnotationWithImage{
+		ann := domain.AnnotationWithImage{
 			Annotation: domain.Annotation{
 				ID:          row.ID,
 				ImageID:     row.ImageID,
 				Username:    row.Username,
 				StageIndex:  int(row.StageIndex),
 				OptionValue: row.OptionValue,
-				AnnotatedAt: row.AnnotatedAt.Time,
 			},
-			ImagePath:             row.Path,
-			ImageOriginalFilename: row.OriginalFilename.String,
+			ImagePath: row.Path,
 		}
+		if row.AnnotatedAt != nil {
+			ann.Annotation.AnnotatedAt = *row.AnnotatedAt
+		}
+		if row.OriginalFilename != nil {
+			ann.ImageOriginalFilename = *row.OriginalFilename
+		}
+		result[i] = &ann
 	}
 
 	return result, nil
@@ -164,7 +170,12 @@ func (r *AnnotationRepository) Exists(ctx context.Context, imageID int64, userna
 		StageIndex: int64(stageIndex),
 	}
 
-	return r.queries.CheckAnnotationExists(ctx, params)
+	// The generated CheckAnnotationExists returns int64 (0 or 1 for SQLite)
+	exists, err := r.queries.CheckAnnotationExists(ctx, params)
+	if err != nil {
+		return false, err
+	}
+	return exists > 0, nil
 }
 
 // Delete removes an annotation by ID
@@ -193,14 +204,17 @@ func (r *AnnotationRepository) GetStats(ctx context.Context) (*domain.Annotation
 
 // toDomainAnnotation converts a sqlc.Annotation to domain.Annotation
 func toDomainAnnotation(ann sqlc.Annotation) *domain.Annotation {
-	return &domain.Annotation{
+	d := &domain.Annotation{
 		ID:          ann.ID,
 		ImageID:     ann.ImageID,
 		Username:    ann.Username,
 		StageIndex:  int(ann.StageIndex),
 		OptionValue: ann.OptionValue,
-		AnnotatedAt: ann.AnnotatedAt,
 	}
+	if ann.AnnotatedAt != nil {
+		d.AnnotatedAt = *ann.AnnotatedAt
+	}
+	return d
 }
 
 // Verify that AnnotationRepository implements domain.AnnotationRepository

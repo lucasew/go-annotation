@@ -40,11 +40,11 @@ WHERE i.is_finished = FALSE
   AND NOT EXISTS (
     SELECT 1 FROM annotations a
     WHERE a.image_id = i.id
-      AND a.username = ?
-      AND a.stage_index = ?
+      AND a.username = @username
+      AND a.stage_index = @stage_index
   )
 ORDER BY i.completed_stages ASC, i.id ASC
-LIMIT ?;
+LIMIT @limit;
 
 -- name: CheckAnnotationExists :one
 SELECT EXISTS (

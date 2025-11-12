@@ -31,10 +31,9 @@ func NewImageRepositoryWithTx(tx *sql.Tx) *ImageRepository {
 func (r *ImageRepository) Create(ctx context.Context, path, originalFilename string) (*domain.Image, error) {
 	params := sqlc.CreateImageParams{
 		Path: path,
-		OriginalFilename: sql.NullString{
-			String: originalFilename,
-			Valid:  originalFilename != "",
-		},
+	}
+	if originalFilename != "" {
+		params.OriginalFilename = &originalFilename
 	}
 
 	img, err := r.queries.CreateImage(ctx, params)
@@ -103,10 +102,11 @@ func (r *ImageRepository) ListNotFinished(ctx context.Context, limit int) ([]*do
 
 // UpdateCompletionStatus updates the completion status of an image
 func (r *ImageRepository) UpdateCompletionStatus(ctx context.Context, id int64, completedStages int, isFinished bool) error {
+	cs := int64(completedStages)
 	params := sqlc.UpdateImageCompletionStatusParams{
 		ID:              id,
-		CompletedStages: int64(completedStages),
-		IsFinished:      isFinished,
+		CompletedStages: &cs,
+		IsFinished:      &isFinished,
 	}
 
 	return r.queries.UpdateImageCompletionStatus(ctx, params)
@@ -129,14 +129,19 @@ func (r *ImageRepository) Delete(ctx context.Context, id int64) error {
 
 // toDomainImage converts a sqlc.Image to domain.Image
 func toDomainImage(img sqlc.Image) *domain.Image {
-	return &domain.Image{
-		ID:               img.ID,
-		Path:             img.Path,
-		OriginalFilename: img.OriginalFilename.String,
-		IngestedAt:       img.IngestedAt,
-		CompletedStages:  int(img.CompletedStages),
-		IsFinished:       img.IsFinished,
+	d := &domain.Image{
+		ID:              img.ID,
+		Path:            img.Path,
+		CompletedStages: int(img.CompletedStages),
+		IsFinished:      img.IsFinished,
 	}
+	if img.OriginalFilename != nil {
+		d.OriginalFilename = *img.OriginalFilename
+	}
+	if img.IngestedAt != nil {
+		d.IngestedAt = *img.IngestedAt
+	}
+	return d
 }
 
 // Verify that ImageRepository implements domain.ImageRepository
