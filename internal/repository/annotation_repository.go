@@ -1,0 +1,208 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"time"
+
+	"github.com/lucasew/go-annotation/internal/domain"
+	"github.com/lucasew/go-annotation/internal/sqlc"
+)
+
+// AnnotationRepository implements domain.AnnotationRepository using SQLC
+type AnnotationRepository struct {
+	queries *sqlc.Queries
+}
+
+// NewAnnotationRepository creates a new AnnotationRepository
+func NewAnnotationRepository(db *sql.DB) *AnnotationRepository {
+	return &AnnotationRepository{
+		queries: sqlc.New(db),
+	}
+}
+
+// NewAnnotationRepositoryWithTx creates a new AnnotationRepository with a transaction
+func NewAnnotationRepositoryWithTx(tx *sql.Tx) *AnnotationRepository {
+	return &AnnotationRepository{
+		queries: sqlc.New(tx),
+	}
+}
+
+// Create creates or updates an annotation (upsert)
+func (r *AnnotationRepository) Create(ctx context.Context, imageID int64, username string, stageIndex int, optionValue string) (*domain.Annotation, error) {
+	params := sqlc.CreateAnnotationParams{
+		ImageID:     imageID,
+		Username:    username,
+		StageIndex:  int64(stageIndex),
+		OptionValue: optionValue,
+	}
+
+	ann, err := r.queries.CreateAnnotation(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return toDomainAnnotation(ann), nil
+}
+
+// Get retrieves a specific annotation
+func (r *AnnotationRepository) Get(ctx context.Context, imageID int64, username string, stageIndex int) (*domain.Annotation, error) {
+	params := sqlc.GetAnnotationParams{
+		ImageID:    imageID,
+		Username:   username,
+		StageIndex: int64(stageIndex),
+	}
+
+	ann, err := r.queries.GetAnnotation(ctx, params)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return toDomainAnnotation(ann), nil
+}
+
+// GetForImage retrieves all annotations for a specific image
+func (r *AnnotationRepository) GetForImage(ctx context.Context, imageID int64) ([]*domain.Annotation, error) {
+	anns, err := r.queries.GetAnnotationsForImage(ctx, imageID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*domain.Annotation, len(anns))
+	for i, ann := range anns {
+		result[i] = toDomainAnnotation(ann)
+	}
+
+	return result, nil
+}
+
+// GetByUser retrieves annotations by a specific user (paginated)
+func (r *AnnotationRepository) GetByUser(ctx context.Context, username string, limit, offset int) ([]*domain.AnnotationWithImage, error) {
+	params := sqlc.GetAnnotationsByUserParams{
+		Username: username,
+		Limit:    int64(limit),
+		Offset:   int64(offset),
+	}
+
+	rows, err := r.queries.GetAnnotationsByUser(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*domain.AnnotationWithImage, len(rows))
+	for i, row := range rows {
+		result[i] = &domain.AnnotationWithImage{
+			Annotation: domain.Annotation{
+				ID:          row.ID,
+				ImageID:     row.ImageID,
+				Username:    row.Username,
+				StageIndex:  int(row.StageIndex),
+				OptionValue: row.OptionValue,
+				AnnotatedAt: row.AnnotatedAt.Time,
+			},
+			ImagePath:            row.Path,
+			ImageOriginalFilename: row.OriginalFilename.String,
+		}
+	}
+
+	return result, nil
+}
+
+// GetByImageAndUser retrieves all annotations for an image by a specific user
+func (r *AnnotationRepository) GetByImageAndUser(ctx context.Context, imageID int64, username string) ([]*domain.Annotation, error) {
+	params := sqlc.GetAnnotationsByImageAndUserParams{
+		ImageID:  imageID,
+		Username: username,
+	}
+
+	anns, err := r.queries.GetAnnotationsByImageAndUser(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*domain.Annotation, len(anns))
+	for i, ann := range anns {
+		result[i] = toDomainAnnotation(ann)
+	}
+
+	return result, nil
+}
+
+// CountByUser returns the total number of annotations by a user
+func (r *AnnotationRepository) CountByUser(ctx context.Context, username string) (int64, error) {
+	return r.queries.CountAnnotationsByUser(ctx, username)
+}
+
+// ListPendingImagesForUserAndStage finds images that need annotation by a user for a specific stage
+func (r *AnnotationRepository) ListPendingImagesForUserAndStage(ctx context.Context, username string, stageIndex int, limit int) ([]*domain.Image, error) {
+	params := sqlc.ListPendingImagesForUserAndStageParams{
+		Username:   username,
+		StageIndex: int64(stageIndex),
+		Limit:      int64(limit),
+	}
+
+	images, err := r.queries.ListPendingImagesForUserAndStage(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*domain.Image, len(images))
+	for i, img := range images {
+		result[i] = toDomainImage(img)
+	}
+
+	return result, nil
+}
+
+// Exists checks if an annotation exists
+func (r *AnnotationRepository) Exists(ctx context.Context, imageID int64, username string, stageIndex int) (bool, error) {
+	params := sqlc.CheckAnnotationExistsParams{
+		ImageID:    imageID,
+		Username:   username,
+		StageIndex: int64(stageIndex),
+	}
+
+	return r.queries.CheckAnnotationExists(ctx, params)
+}
+
+// Delete removes an annotation by ID
+func (r *AnnotationRepository) Delete(ctx context.Context, id int64) error {
+	return r.queries.DeleteAnnotation(ctx, id)
+}
+
+// DeleteForImage removes all annotations for an image
+func (r *AnnotationRepository) DeleteForImage(ctx context.Context, imageID int64) error {
+	return r.queries.DeleteAnnotationsForImage(ctx, imageID)
+}
+
+// GetStats returns overall annotation statistics
+func (r *AnnotationRepository) GetStats(ctx context.Context) (*domain.AnnotationStats, error) {
+	stats, err := r.queries.GetAnnotationStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.AnnotationStats{
+		AnnotatedImages:  stats.AnnotatedImages,
+		TotalAnnotations: stats.TotalAnnotations,
+		TotalUsers:       stats.TotalUsers,
+	}, nil
+}
+
+// toDomainAnnotation converts a sqlc.Annotation to domain.Annotation
+func toDomainAnnotation(ann sqlc.Annotation) *domain.Annotation {
+	return &domain.Annotation{
+		ID:          ann.ID,
+		ImageID:     ann.ImageID,
+		Username:    ann.Username,
+		StageIndex:  int(ann.StageIndex),
+		OptionValue: ann.OptionValue,
+		AnnotatedAt: ann.AnnotatedAt,
+	}
+}
+
+// Verify that AnnotationRepository implements domain.AnnotationRepository
+var _ domain.AnnotationRepository = (*AnnotationRepository)(nil)

@@ -1,0 +1,3 @@
+schema_file: "db/schema.sql"
+migrations_dir: "db/migrations"
+migrations_table: "schema_migrations"
