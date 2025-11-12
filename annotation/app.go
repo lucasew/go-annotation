@@ -72,6 +72,80 @@ type AnnotationStep struct {
 type TaskWithCount struct {
 	*ConfigTask
 	AvailableCount int
+	TotalCount     int
+	CompletedCount int
+}
+
+// CountEligibleImages counts all images that are eligible for this task (regardless of annotation status)
+func (a *AnnotatorApp) CountEligibleImages(ctx context.Context, taskID string) (int, error) {
+	// Find stage index for this task
+	stageIndex := -1
+	for i, task := range a.Config.Tasks {
+		if task.ID == taskID {
+			stageIndex = i
+			break
+		}
+	}
+	if stageIndex == -1 {
+		return 0, fmt.Errorf("task not found: %s", taskID)
+	}
+
+	task := a.Config.Tasks[stageIndex]
+
+	// If no dependencies, all images are eligible
+	if len(task.If) == 0 {
+		count, err := a.imageRepo.Count(ctx)
+		return int(count), err
+	}
+
+	// Get all images and filter by dependencies
+	allImages, err := a.imageRepo.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("while listing images: %w", err)
+	}
+
+	validCount := 0
+	for _, img := range allImages {
+		valid := true
+		// Check each dependency
+		for depTaskID, requiredValue := range task.If {
+			// Find the stage index for the dependency task
+			depStageIndex := -1
+			for i, t := range a.Config.Tasks {
+				if t.ID == depTaskID {
+					depStageIndex = i
+					break
+				}
+			}
+			if depStageIndex == -1 {
+				continue
+			}
+
+			// Check if this image has the required annotation value for the dependency
+			hasValidAnnotation := false
+			imageHashes, err := a.annotationRepo.GetImageHashesWithAnnotation(ctx, int64(depStageIndex), requiredValue)
+			if err != nil {
+				return 0, fmt.Errorf("while checking dependency: %w", err)
+			}
+			for _, hash := range imageHashes {
+				if hash == img.SHA256 {
+					hasValidAnnotation = true
+					break
+				}
+			}
+
+			if !hasValidAnnotation {
+				valid = false
+				break
+			}
+		}
+
+		if valid {
+			validCount++
+		}
+	}
+
+	return validCount, nil
 }
 
 func (a *AnnotatorApp) CountAvailableImages(ctx context.Context, taskID string) (int, error) {
@@ -371,15 +445,30 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		if len(itemPath) == 1 {
 			// Only populate tasks for the timeline view (no markdown for tasks)
 			tasks = make([]TaskWithCount, 0, len(a.Config.Tasks))
+
 			for _, task := range a.Config.Tasks {
-				count, err := a.CountAvailableImages(r.Context(), task.ID)
+				availableCount, err := a.CountAvailableImages(r.Context(), task.ID)
 				if err != nil {
 					log.Printf("error counting available images for task %s: %s", task.ID, err)
-					count = 0
+					availableCount = 0
 				}
+
+				totalEligible, err := a.CountEligibleImages(r.Context(), task.ID)
+				if err != nil {
+					log.Printf("error counting eligible images for task %s: %s", task.ID, err)
+					totalEligible = availableCount // fallback to available
+				}
+
+				completedCount := totalEligible - availableCount
+				if completedCount < 0 {
+					completedCount = 0
+				}
+
 				tasks = append(tasks, TaskWithCount{
 					ConfigTask:     task,
-					AvailableCount: count,
+					AvailableCount: availableCount,
+					TotalCount:     totalEligible,
+					CompletedCount: completedCount,
 				})
 			}
 		} else if len(itemPath) == 2 {
