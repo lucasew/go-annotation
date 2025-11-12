@@ -4,71 +4,134 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/lucasew/go-annotation/annotation"
 	"github.com/spf13/cobra"
 )
 
 // annotatorCmd represents the annotator command
 var annotatorCmd = &cobra.Command{
-	Use:   "annotator",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Use:   "annotator [folder|config.yaml]",
+	Short: "Start the annotation web server",
+	Long: `Start the annotation web server.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+If you provide a folder path, it will:
+  - Create a default config.yaml in that folder
+  - Create an annotations.db in that folder
+  - Use the folder as the images directory
+
+If you provide a config file path, it will:
+  - Use that config to start the server
+  - Require --database and --images flags
+
+Examples:
+  # Initialize and start from a folder
+  go-annotation annotator ./my-project
+
+  # Start with explicit config
+  go-annotation annotator -c config.yaml -d annotations.db -i ./images
+`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		addr, err := cmd.Flags().GetString("addr")
-		if err != nil {
-			return err
-		}
-		configFile, err := cmd.Flags().GetString("config")
-		if err != nil {
-			return err
+		var configFile, databaseFile, imagesDir string
+		var err error
+
+		// Check if a positional argument was provided
+		if len(args) == 1 {
+			arg := args[0]
+
+			// Check if it's a directory
+			if stat, err := os.Stat(arg); err == nil && stat.IsDir() {
+				// It's a folder - initialize it
+				log.Printf("Detected folder argument: %s", arg)
+				log.Printf("Initializing project in folder...")
+
+				configFile = filepath.Join(arg, "config.yaml")
+				databaseFile = filepath.Join(arg, "annotations.db")
+				imagesDir = arg
+
+				// Create config if it doesn't exist
+				if _, err := os.Stat(configFile); os.IsNotExist(err) {
+					log.Printf("Creating default config: %s", configFile)
+					if err := createSampleConfig(configFile, imagesDir); err != nil {
+						return fmt.Errorf("failed to create config: %w", err)
+					}
+				}
+			} else {
+				// Assume it's a config file
+				configFile = arg
+
+				// Require other flags
+				databaseFile, err = cmd.Flags().GetString("database")
+				if err != nil || databaseFile == "" {
+					return fmt.Errorf("when providing a config file, --database flag is required")
+				}
+
+				imagesDir, err = cmd.Flags().GetString("images")
+				if err != nil || imagesDir == "" {
+					return fmt.Errorf("when providing a config file, --images flag is required")
+				}
+			}
+		} else {
+			// No positional arg - use flags
+			configFile, err = cmd.Flags().GetString("config")
+			if err != nil || configFile == "" {
+				return fmt.Errorf("either provide a folder/config argument or use --config flag")
+			}
+
+			databaseFile, err = cmd.Flags().GetString("database")
+			if err != nil || databaseFile == "" {
+				return fmt.Errorf("--database flag is required")
+			}
+
+			imagesDir, err = cmd.Flags().GetString("images")
+			if err != nil || imagesDir == "" {
+				return fmt.Errorf("--images flag is required")
+			}
 		}
 
+		// Load config
 		config, err := annotation.LoadConfig(configFile)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load config: %w", err)
 		}
 
-		spew.Dump(config)
-		databaseFile, err := cmd.Flags().GetString("database")
-		if err != nil {
-			return err
-		}
+		// Open database
 		db, err := annotation.GetDatabase(databaseFile)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open database: %w", err)
 		}
 		defer db.Close()
-		spew.Dump(db)
 
-		imagesDir, err := cmd.Flags().GetString("images")
-		if err != nil {
-			return err
-		}
-
+		// Create app
 		app := &annotation.AnnotatorApp{
 			ImagesDir: imagesDir,
 			Database:  db,
 			Config:    config,
 		}
-		err = app.PrepareDatabase(cmd.Context())
-		if err != nil {
-			return err
+
+		// Prepare database
+		if err := app.PrepareDatabase(cmd.Context()); err != nil {
+			return fmt.Errorf("failed to prepare database: %w", err)
 		}
 
-		spew.Dump(databaseFile, imagesDir)
+		// Get bind address
+		addr, _ := cmd.Flags().GetString("addr")
+
+		log.Printf("Configuration: %s", configFile)
+		log.Printf("Database: %s", databaseFile)
+		log.Printf("Images: %s", imagesDir)
+		log.Printf("Tasks configured: %d", len(config.Tasks))
 		for _, task := range config.Tasks {
-			log.Printf("task: %s -- %s", task.ID, task.Name)
+			log.Printf("  - %s: %s", task.ID, task.Name)
 		}
-		log.Printf("Listening on: %s", addr)
+		log.Printf("Starting server on: %s", addr)
+
 		return http.ListenAndServe(addr, app.GetHTTPHandler())
 	},
 }
@@ -76,22 +139,9 @@ to quickly create a Cobra application.`,
 func init() {
 	rootCmd.AddCommand(annotatorCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	annotatorCmd.PersistentFlags().StringP("config", "c", "", "Config file for the annotation")
-	annotatorCmd.MarkPersistentFlagRequired("config")
-	annotatorCmd.MarkPersistentFlagFilename("config")
-	annotatorCmd.PersistentFlags().StringP("database", "d", "", "Where to store the annotation database")
-	annotatorCmd.MarkPersistentFlagRequired("database")
-	annotatorCmd.MarkPersistentFlagFilename("database")
-	annotatorCmd.PersistentFlags().StringP("images", "i", "", "Where to store the images")
-	annotatorCmd.MarkPersistentFlagDirname("images")
-	annotatorCmd.MarkPersistentFlagRequired("images")
-
-	annotatorCmd.PersistentFlags().StringP("addr", "a", ":8080", "Where bind the webserver")
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// annotatorCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// Optional flags (only used when not providing a folder argument)
+	annotatorCmd.Flags().StringP("config", "c", "", "Config file for the annotation")
+	annotatorCmd.Flags().StringP("database", "d", "", "Database file path")
+	annotatorCmd.Flags().StringP("images", "i", "", "Images directory path")
+	annotatorCmd.Flags().StringP("addr", "a", ":8080", "Address to bind the webserver")
 }
