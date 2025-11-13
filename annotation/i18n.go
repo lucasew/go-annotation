@@ -51,6 +51,14 @@ func SetLanguage(lang string) {
 	defaultLocal = i18n.NewLocalizer(bundle, currentLocale)
 }
 
+// AddMessage adds a message to the bundle dynamically (useful for YAML config)
+func AddMessage(lang, messageID, translation string) error {
+	return bundle.AddMessages(language.MustParse(lang), &i18n.Message{
+		ID:    messageID,
+		Other: translation,
+	})
+}
+
 // GetLocalizerFromContext retrieves the localizer from context, or returns default
 func GetLocalizerFromContext(ctx context.Context) *i18n.Localizer {
 	if ctx == nil {
