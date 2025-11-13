@@ -4,19 +4,19 @@
 
 Modern web-based annotation tool with a clean UI, keyboard shortcuts, and collaborative features. Built with Go, HTMX, DaisyUI, and TailwindCSS.
 
-## ✨ Features
+## Features
 
-- 🎨 **Modern UI** - Beautiful interface with DaisyUI and TailwindCSS
-- ⌨️ **Keyboard Shortcuts** - Annotate faster with number keys (1-9) and `?` for unsure
-- 🌓 **Dark Mode** - Theme toggle with localStorage persistence
-- 🔐 **Authentication** - Multi-user support with password protection
-- 📊 **Conditional Tasks** - Create annotation workflows with dependencies
-- 🎯 **Task Types** - Boolean, rotation, and custom classification tasks
-- 🌍 **i18n Support** - Internationalization for multiple languages
-- 📱 **Responsive** - Works on desktop and mobile devices
-- 🚀 **Fast** - No CGO dependencies, pure Go with SQLite
+- **Modern UI** - Beautiful interface with DaisyUI and TailwindCSS
+- **Keyboard Shortcuts** - Annotate faster with number keys (1-9) and `?` for unsure
+- **Dark Mode** - Theme toggle with localStorage persistence
+- **Authentication** - Multi-user support with password protection
+- **Conditional Tasks** - Create annotation workflows with dependencies
+- **Task Types** - Boolean, rotation, and custom classification tasks
+- **i18n Support** - Internationalization for multiple languages
+- **Responsive** - Works on desktop and mobile devices
+- **Fast** - No CGO dependencies, pure Go with SQLite, SQLc to reduce overhead and indirection.
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Initialize a Project
 
@@ -37,72 +37,9 @@ go-annotation folder/config.yaml
 
 Then open http://localhost:8080 in your browser!
 
-## ⚙️ Configuration
+##  Configuration
 
 There is a ready example in ./examples/test for you to play!
-
-### Sample config.yaml
-
-```yaml
-meta:
-  description: |
-    My Image Classification Project
-    Instructions for annotators go here.
-
-# Define users and passwords
-auth:
-  admin:
-    password: "secure_password"
-  annotator1:
-    password: "another_password"
-
-# Define annotation tasks
-tasks:
-  # Simple classification
-  - id: quality
-    name: "Image Quality"
-    short_name: "Quality"
-    classes:
-      good:
-        name: "Good"
-        description: "Clear and well-focused"
-      bad:
-        name: "Bad"
-        description: "Blurry or poor quality"
-
-  # Boolean task (uses built-in type)
-  - id: contains_animal
-    name: "Contains an animal?"
-    type: boolean  # Creates Yes/No automatically
-
-  # Conditional task (only shown based on previous answer)
-  - id: animal_type
-    name: "What type of animal?"
-    if:
-      contains_animal: "true"  # Only show if previous is "Yes"
-    classes:
-      cat:
-        name: "Cat"
-      dog:
-        name: "Dog"
-      bird:
-        name: "Bird"
-      other:
-        name: "Other"
-
-  # Rotation detection (uses built-in type)
-  - id: rotation
-    name: "Image Rotation"
-    type: rotation  # OK, ±90°, 180°, H/V flip
-
-# Internationalization (optional)
-i18n:
-  - name: "Welcome"
-    value: "Bem-vindo"
-  - name: "Help"
-    value: "Ajuda"
-```
-
 ### Task Types
 
 **Built-in types:**
@@ -135,7 +72,7 @@ auth:
 - **Backend**: Go templates with HTMX for SPA-like interactions
 - **Frontend**: DaisyUI + TailwindCSS with @tailwindcss/typography
 - **Templates**: Mold for layout inheritance
-- **Database**: SQLite (modernc.org/sqlite - pure Go, no CGO)
+- **Database**: SQLc + SQLite (modernc.org/sqlite - pure Go, no CGO)
 
 ### Project Structure
 ```
