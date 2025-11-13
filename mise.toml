@@ -1,2 +1,44 @@
 [tools]
+"github:sqlc-dev/sqlc" = "1.30.0"
 go = "1.25.4"
+node = "22"
+
+[tasks.gen]
+description = "Generate all assets"
+depends = ["gen:*"]
+
+[tasks."gen:css"]
+description = "Generate CSS from Tailwind"
+run = "npm run build:css"
+
+[tasks."gen:sqlc"]
+description = "Generate Go code from SQL queries using sqlc"
+run = "sqlc generate"
+
+[tasks.ci]
+description = "Run CI checks (gen + build)"
+depends = ["gen"]
+run = "go build -v ./cmd/go-annotation"
+
+[tasks.test]
+description = "Run all tests with coverage"
+run = """
+go test -v -race -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+echo "✓ Coverage report generated: coverage.html"
+"""
+
+[tasks."test-short"]
+description = "Run short tests (no integration tests)"
+run = "go test -short -v ./..."
+
+[tasks.build]
+description = "Build the binary"
+run = "go build -v -o go-annotation ./cmd/go-annotation"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = """
+rm -f go-annotation coverage.out coverage.html
+echo "✓ Cleaned"
+"""
