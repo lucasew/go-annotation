@@ -17,18 +17,22 @@ import (
 
 	"math/rand"
 
+	"github.com/go-git/go-billy/v6/helper/iofs"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/lucasew/go-annotation/db/migrations"
 	"github.com/lucasew/go-annotation/internal/domain"
 	"github.com/lucasew/go-annotation/internal/repository"
 )
 
 type AnnotatorApp struct {
-	ImagesDir          string
-	Database           *sql.DB
-	Config             *Config
-	OffsetAdvance      int
-	i18n               map[string]string
-	imageRepo          *repository.ImageRepository
-	annotationRepo     *repository.AnnotationRepository
+	ImagesDir      string
+	Database       *sql.DB
+	Config         *Config
+	OffsetAdvance  int
+	i18n           map[string]string
+	imageRepo      *repository.ImageRepository
+	annotationRepo *repository.AnnotationRepository
 }
 
 func (a *AnnotatorApp) init() {
@@ -77,14 +81,14 @@ type TaskWithCount struct {
 }
 
 type PhaseProgress struct {
-	Completed            int     // Images completed in this phase
-	Pending              int     // Images eligible but not yet annotated
-	FilteredWrongClass   int     // Images annotated in dependency phase but with wrong class
-	NotYetAnnotated      int     // Images not yet annotated in dependency phase
-	Total                int     // Total images in the entire dataset
-	CompletedPercent     float64 // Percentage of completed images
-	PendingPercent       float64 // Percentage of pending images
-	FilteredPercent      float64 // Percentage of filtered (wrong class) images
+	Completed              int     // Images completed in this phase
+	Pending                int     // Images eligible but not yet annotated
+	FilteredWrongClass     int     // Images annotated in dependency phase but with wrong class
+	NotYetAnnotated        int     // Images not yet annotated in dependency phase
+	Total                  int     // Total images in the entire dataset
+	CompletedPercent       float64 // Percentage of completed images
+	PendingPercent         float64 // Percentage of pending images
+	FilteredPercent        float64 // Percentage of filtered (wrong class) images
 	NotYetAnnotatedPercent float64 // Percentage of not yet annotated images
 }
 
@@ -954,41 +958,15 @@ func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
 // This must be called synchronously before starting the HTTP server.
 func (a *AnnotatorApp) PrepareDatabaseMigrations(ctx context.Context) error {
 	a.init()
-
-	log.Printf("PrepareDatabaseMigrations: running database migrations")
-	// Run the migration SQL to create the new schema
-	migrationSQL := `
--- Images table stores information about images to be annotated
--- Uses SHA256 hash as primary key for content-based addressing
-CREATE TABLE IF NOT EXISTS images (
-  sha256 TEXT PRIMARY KEY,
-  filename TEXT NOT NULL,
-  ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Annotations table stores all annotations
--- Uses username directly from YAML config (no FK to users table)
-CREATE TABLE IF NOT EXISTS annotations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  image_sha256 TEXT NOT NULL,
-  username TEXT NOT NULL,
-  stage_index INTEGER NOT NULL,
-  option_value TEXT NOT NULL,
-  annotated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(image_sha256, username, stage_index),
-  FOREIGN KEY(image_sha256) REFERENCES images(sha256) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_annotations_image_sha256 ON annotations(image_sha256);
-CREATE INDEX IF NOT EXISTS idx_annotations_username ON annotations(username);
-CREATE INDEX IF NOT EXISTS idx_annotations_stage ON annotations(stage_index);
-	`
-
-	_, err := a.Database.ExecContext(ctx, migrationSQL)
+	db, err := sqlite.WithInstance(a.Database, nil)
 	if err != nil {
-		return fmt.Errorf("while running migrations: %w", err)
+		return err
 	}
-
+	migrationsFS := iofs.New(migrations.Migrations)
+	m, err := migrate.NewWithInstance("iofs", migrationsFS, "sqlite", db)
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
 	log.Printf("PrepareDatabaseMigrations: migrations completed successfully")
 	return nil
 }
