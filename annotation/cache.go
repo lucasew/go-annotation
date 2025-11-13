@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/lucasew/go-annotation/internal/domain"
+	"github.com/lewtec/rotulador/internal/domain"
 )
 
 // contextKey is a custom type for context keys to avoid collisions

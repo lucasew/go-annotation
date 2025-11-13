@@ -1,4 +1,4 @@
-# go-annotation
+# Rotulador
 
 > Simple and powerful tool to annotate image datasets for classification
 
@@ -22,17 +22,17 @@ Modern web-based annotation tool with a clean UI, keyboard shortcuts, and collab
 
 ```bash
 # Create config, database and empty image folder
-go-annotation folder
+rotulador folder
 
 # Ingest a folder of messy files to a images folder
-go-annotation ingest ./messy-folder ./images
+rotulador ingest ./messy-folder ./images
 
 ```
 
 ### Start Annotating
 
 ```bash
-go-annotation folder/config.yaml
+rotulador folder/config.yaml
 ```
 
 Then open http://localhost:8080 in your browser!
@@ -76,7 +76,7 @@ auth:
 
 ### Project Structure
 ```
-go-annotation/
+rotulador/
 ├── annotation/          # Core annotation logic
 │   ├── templates/      # Mold templates
 │   │   ├── layouts/    # Base layouts

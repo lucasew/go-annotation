@@ -18,7 +18,7 @@ run = "sqlc generate"
 [tasks.ci]
 description = "Run CI checks (gen + build)"
 depends = ["gen"]
-run = "go build -v ./cmd/go-annotation"
+run = "go build -v ./cmd/rotulador"
 
 [tasks.test]
 description = "Run all tests with coverage"
@@ -34,11 +34,11 @@ run = "go test -short -v ./..."
 
 [tasks.build]
 description = "Build the binary"
-run = "go build -v -o go-annotation ./cmd/go-annotation"
+run = "go build -v -o rotulador ./cmd/rotulador"
 
 [tasks.clean]
 description = "Clean build artifacts"
 run = """
-rm -f go-annotation coverage.out coverage.html
+rm -f rotulador coverage.out coverage.html
 echo "✓ Cleaned"
 """

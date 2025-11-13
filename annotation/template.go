@@ -16,6 +16,9 @@ var (
 	//go:embed assets/css/output.css
 	cssContent string
 
+	//go:embed assets/favicon.svg
+	faviconContent string
+
 	// Template manager with mold for layout support
 	templateManager *TemplateManager = nil
 
@@ -67,4 +70,9 @@ func RenderPageWithTitle(w io.Writer, pageName, title string, data any) error {
 	}
 
 	return RenderPage(w, pageName, dataMap)
+}
+
+// GetFavicon returns the embedded favicon content
+func GetFavicon() string {
+	return faviconContent
 }

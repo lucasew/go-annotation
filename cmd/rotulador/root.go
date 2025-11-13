@@ -12,13 +12,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lucasew/go-annotation/annotation"
+	"github.com/lewtec/rotulador/annotation"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "go-annotation [folder|config.yaml]",
+	Use:   "rotulador [folder|config.yaml]",
 	Short: "Quickly make image annotations",
 	Long: strings.TrimSpace(`
 With a set of trivial choices scale the classification of a set of images to many people to build datasets to train classifiers.
@@ -69,7 +69,7 @@ With a set of trivial choices scale the classification of a set of images to man
 					log.Printf("✓ Images directory already exists: %s.", imagesDir)
 				}
 
-				log.Printf("You can now run 'go-annotation %s' to start the server.", arg)
+				log.Printf("You can now run 'rotulador %s' to start the server.", arg)
 				return nil // Always exit after handling a directory argument
 			}
 		}

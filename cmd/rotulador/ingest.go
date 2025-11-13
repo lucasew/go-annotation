@@ -13,7 +13,7 @@ import (
 	"image"
 	"path/filepath"
 
-	"github.com/lucasew/go-annotation/annotation"
+	"github.com/lewtec/rotulador/annotation"
 	"github.com/spf13/cobra"
 )
 

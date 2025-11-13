@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/lucasew/go-annotation/internal/domain"
-	"github.com/lucasew/go-annotation/internal/sqlc"
+	"github.com/lewtec/rotulador/internal/domain"
+	"github.com/lewtec/rotulador/internal/sqlc"
 )
 
 // AnnotationRepository implements domain.AnnotationRepository using SQLC

@@ -1,4 +1,4 @@
-module github.com/lucasew/go-annotation
+module github.com/lewtec/rotulador
 
 go 1.24.0
 
