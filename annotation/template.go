@@ -1,11 +1,14 @@
 package annotation
 
 import (
+	"context"
 	"embed"
 	"html/template"
 	"io"
 	"maps"
+	"net/http"
 
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/russross/blackfriday/v2"
 )
 
@@ -53,6 +56,34 @@ func RenderPage(w io.Writer, pageName string, data map[string]any) error {
 	data["CSS"] = template.CSS(cssContent)
 
 	return templateManager.Render(w, "pages/"+pageName, data)
+}
+
+// RenderPageWithContext renders a page with context-aware i18n
+func RenderPageWithContext(ctx context.Context, w io.Writer, pageName string, data map[string]any) error {
+	// Inject CSS automatically
+	if data == nil {
+		data = make(map[string]any)
+	}
+	data["CSS"] = template.CSS(cssContent)
+
+	// Inject context-aware translation function
+	localizer := GetLocalizerFromContext(ctx)
+	data["i"] = func(messageID string) string {
+		msg, err := localizer.Localize(&i18n.LocalizeConfig{
+			MessageID: messageID,
+		})
+		if err != nil {
+			return messageID
+		}
+		return msg
+	}
+
+	return templateManager.Render(w, "pages/"+pageName, data)
+}
+
+// RenderPageWithRequest renders a page with request-aware i18n
+func RenderPageWithRequest(r *http.Request, w io.Writer, pageName string, data map[string]any) error {
+	return RenderPageWithContext(r.Context(), w, pageName, data)
 }
 
 // RenderPageWithTitle is a convenience function to render a page with just a title
