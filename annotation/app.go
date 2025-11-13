@@ -17,9 +17,9 @@ import (
 
 	"math/rand"
 
-	"github.com/go-git/go-billy/v6/helper/iofs"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/lucasew/go-annotation/db/migrations"
 	"github.com/lucasew/go-annotation/internal/domain"
 	"github.com/lucasew/go-annotation/internal/repository"
@@ -962,7 +962,10 @@ func (a *AnnotatorApp) PrepareDatabaseMigrations(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	migrationsFS := iofs.New(migrations.Migrations)
+	migrationsFS, err := iofs.New(migrations.Migrations, ".")
+	if err != nil {
+		return err
+	}
 	m, err := migrate.NewWithInstance("iofs", migrationsFS, "sqlite", db)
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return err
