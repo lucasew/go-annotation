@@ -3,6 +3,7 @@ package annotation
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
