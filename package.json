@@ -1,14 +1,16 @@
 {
   "name": "rotulador",
   "version": "1.0.0",
+  "type": "module",
   "description": "Image annotation tool with Go backend",
   "scripts": {
     "build:css": "npx tailwindcss -i ./assets/css/input.css -o ./annotation/assets/css/output.css --minify",
     "watch:css": "npx tailwindcss -i ./assets/css/input.css -o ./annotation/assets/css/output.css --watch"
   },
   "devDependencies": {
-    "@tailwindcss/typography": "^0.5.15",
-    "daisyui": "^4.12.14",
-    "tailwindcss": "^3.4.17"
+    "@tailwindcss/cli": "^4.0.6",
+    "@tailwindcss/typography": "^0.5.19",
+    "daisyui": "^5.0.8",
+    "tailwindcss": "^4.0.6"
   }
 }
