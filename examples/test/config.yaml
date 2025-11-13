@@ -46,12 +46,53 @@ auth:
   calabreso:
     password: 123
 i18n:
+  # Navigation and Layout
+  - name: Home
+    value: Início
+  - name: Help
+    value: Ajuda
+  - name: Annotate
+    value: Anotar
+  - name: Toggle theme
+    value: Alternar tema
+  - name: Rotulador - Image Annotation Tool
+    value: Rotulador - Ferramenta de Anotação de Imagens
+
+  # Progress Bar
+  - name: completed
+    value: concluído
+  - name: pending
+    value: pendente
+  - name: not yet annotated in previous phase
+    value: ainda não anotado na fase anterior
+  - name: annotated with wrong class in previous phase
+    value: anotado com classe errada na fase anterior
+
+  # Home Page
+  - name: Annotation Instructions
+    value: Instruções de Anotação
+  - name: Continue Annotations
+    value: Continuar Anotações
+
+  # Complete Page
+  - name: Congratulations!
+    value: Parabéns!
+  - name: All annotations are complete!
+    value: Todas as anotações estão concluídas!
+  - name: Go to Home
+    value: Ir para Início
+
+  # Annotate Page
+  - name: Not Sure
+    value: Não Tenho Certeza
+  - name: Copied to clipboard!
+    value: Copiado para a área de transferência!
+
+  # Help Page
   - name: Project help
     value: Ajuda do projeto
   - name: Description
     value: Descrição
-  - name: Phases
-    value: Fases
   - name: Phase
     value: Fase
   - name: Possible choices
@@ -62,25 +103,29 @@ i18n:
     value: (Sem descrição fornecida)
   - name: Examples
     value: Exemplos
-  - name: Congratulations
-    value: Parabéns
-  - name: All annotations are done
-    value: Todas as anotações estão feitas
-  - name: Go to the main page
-    value: Ir para a página inicial
+  - name: Progress
+    value: Progresso
+  - name: eligible
+    value: elegível
+  - name: total
+    value: total
+  - name: Dependencies:
+    value: Dependências:
+  - name: Back to Overview
+    value: Voltar para Visão Geral
+  - name: Start Annotation
+    value: Iniciar Anotação
+  - name: All images annotated
+    value: Todas as imagens anotadas
+  - name: Annotation Phases
+    value: Fases de Anotação
+  - name: View Details
+    value: Ver Detalhes
+
+  # App.go strings
   - name: annotation
     value: anotação
-  - name: Welcome to go-annotator
-    value: Bem-vindo ao go-annotator
-  - name: Welcome
-    value: Bem-vindo
-  - name: Annotation instructions
-    value: Instruções de anotação
-  - name: Continue annotations
-    value: Continuar anotações
-  - name: Yes
-    value: Sim
-  - name: No
-    value: Não
-  - name: Copied to clipboard!
-    value: Copiado para a área de transferência!
+  - name: Welcome to Rotulador
+    value: Bem-vindo ao Rotulador
+  - name: All annotations are done!
+    value: Todas as anotações estão concluídas!

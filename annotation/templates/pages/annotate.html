@@ -1,9 +1,9 @@
 {{ block "content" . }}
 <div class="breadcrumbs text-sm mb-4">
   <ul>
-    <li><a href="/">Home</a></li>
+    <li><a href="/">{{i "Home"}}</a></li>
     <li><a href="/help/{{.TaskID}}">{{.TaskName}}</a></li>
-    <li>Annotate</li>
+    <li>{{i "Annotate"}}</li>
   </ul>
 </div>
 
@@ -13,7 +13,7 @@
       <div class="flex-1">
         <h2 class="card-title">{{.TaskName}}</h2>
         <div class="flex gap-3 items-center mt-1">
-          <p class="text-xs opacity-70 font-mono cursor-pointer" onclick="navigator.clipboard.writeText('{{.ImageFilename}}'); showToast('Copied to clipboard!')">
+          <p class="text-xs opacity-70 font-mono cursor-pointer" onclick="navigator.clipboard.writeText('{{.ImageFilename}}'); showToast('{{i "Copied to clipboard!"}}')">
             {{.ImageFilename}}
           </p>
           {{if .Progress}}
@@ -44,13 +44,13 @@
   {{end}}
   <button class="btn btn-warning btn-lg flex-1 min-w-[150px]" hx-post="/annotate/{{.TaskID}}/{{.ImageID}}"
     hx-vals='{"selectedClass": "", "sure": "off"}' data-key="?">
-    Not Sure <kbd class="kbd kbd-sm ml-2">?</kbd>
+    {{i "Not Sure"}} <kbd class="kbd kbd-sm ml-2">?</kbd>
   </button>
 </div>
 
 <div class="toast toast-center" id="copy-toast" style="display: none;">
   <div class="alert alert-success">
-    <span id="copy-toast-message">Copied to clipboard!</span>
+    <span id="copy-toast-message">{{i "Copied to clipboard!"}}</span>
   </div>
 </div>
 
