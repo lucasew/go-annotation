@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+// i18nMiddleware adds the appropriate localizer to the request context
+func i18nMiddleware(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		localizer := GetLocalizerFromRequest(r)
+		ctx := WithLocalizer(r.Context(), localizer)
+		handler.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func HTTPLogger(handler http.Handler) http.Handler {
     return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
         initialTime := time.Now()

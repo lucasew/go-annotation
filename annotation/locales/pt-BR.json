@@ -1,0 +1,130 @@
+[
+  {
+    "id": "Home",
+    "translation": "Início"
+  },
+  {
+    "id": "Help",
+    "translation": "Ajuda"
+  },
+  {
+    "id": "Annotate",
+    "translation": "Anotar"
+  },
+  {
+    "id": "Toggle theme",
+    "translation": "Alternar tema"
+  },
+  {
+    "id": "Image Annotation Tool",
+    "translation": "Ferramenta de Anotação de Imagens"
+  },
+  {
+    "id": "completed",
+    "translation": "concluídas"
+  },
+  {
+    "id": "pending",
+    "translation": "pendentes"
+  },
+  {
+    "id": "not yet annotated in previous phase",
+    "translation": "ainda não anotadas na fase anterior"
+  },
+  {
+    "id": "annotated with wrong class in previous phase",
+    "translation": "anotadas com classe errada na fase anterior"
+  },
+  {
+    "id": "Welcome to Rotulador",
+    "translation": "Bem-vindo ao Rotulador"
+  },
+  {
+    "id": "Annotation Instructions",
+    "translation": "Instruções de Anotação"
+  },
+  {
+    "id": "Continue Annotations",
+    "translation": "Continuar Anotações"
+  },
+  {
+    "id": "Project help",
+    "translation": "Ajuda do projeto"
+  },
+  {
+    "id": "Progress",
+    "translation": "Progresso"
+  },
+  {
+    "id": "eligible",
+    "translation": "elegíveis"
+  },
+  {
+    "id": "total",
+    "translation": "total"
+  },
+  {
+    "id": "Dependencies:",
+    "translation": "Dependências:"
+  },
+  {
+    "id": "Back to Overview",
+    "translation": "Voltar à Visão Geral"
+  },
+  {
+    "id": "Start Annotation",
+    "translation": "Iniciar Anotação"
+  },
+  {
+    "id": "All images annotated",
+    "translation": "Todas as imagens anotadas"
+  },
+  {
+    "id": "Description",
+    "translation": "Descrição"
+  },
+  {
+    "id": "(No description provided)",
+    "translation": "(Nenhuma descrição fornecida)"
+  },
+  {
+    "id": "Phase",
+    "translation": "Fase"
+  },
+  {
+    "id": "Possible choices",
+    "translation": "Escolhas possíveis"
+  },
+  {
+    "id": "(No name)",
+    "translation": "(Sem nome)"
+  },
+  {
+    "id": "Examples",
+    "translation": "Exemplos"
+  },
+  {
+    "id": "Annotation Phases",
+    "translation": "Fases de Anotação"
+  },
+  {
+    "id": "View Details",
+    "translation": "Ver Detalhes"
+  },
+  {
+    "id": "Copied to clipboard!",
+    "translation": "Copiado para a área de transferência!"
+  },
+  {
+    "id": "Not Sure",
+    "translation": "Não Tenho Certeza"
+  },
+  {
+    "id": "All annotations are done!",
+    "translation": "Todas as anotações foram concluídas!"
+  },
+  {
+    "id": "annotation",
+    "translation": "anotação"
+  }
+]
