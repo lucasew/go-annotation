@@ -958,11 +958,11 @@ func (a *AnnotatorApp) PrepareDatabase(ctx context.Context) error {
 // This must be called synchronously before starting the HTTP server.
 func (a *AnnotatorApp) PrepareDatabaseMigrations(ctx context.Context) error {
 	a.init()
-	db, err := sqlite.WithInstance(a.Database, nil)
+	db, err := sqlite.WithInstance(a.Database, &sqlite.Config{})
 	if err != nil {
 		return err
 	}
-	migrationsFS, err := iofs.New(migrations.Migrations, ".")
+	migrationsFS, err := iofs.New(migrations.Migrations, "")
 	if err != nil {
 		return err
 	}

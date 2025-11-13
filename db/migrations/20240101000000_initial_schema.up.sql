@@ -1,5 +1,3 @@
--- migrate:up
-
 -- Images table stores information about images to be annotated
 -- Uses SHA256 hash as primary key for content-based addressing
 CREATE TABLE images (
@@ -24,12 +22,3 @@ CREATE TABLE annotations (
 CREATE INDEX idx_annotations_image_sha256 ON annotations(image_sha256);
 CREATE INDEX idx_annotations_username ON annotations(username);
 CREATE INDEX idx_annotations_stage ON annotations(stage_index);
-
--- migrate:down
-
-DROP INDEX IF EXISTS idx_annotations_stage;
-DROP INDEX IF EXISTS idx_annotations_username;
-DROP INDEX IF EXISTS idx_annotations_image_sha256;
-DROP TABLE IF EXISTS annotations;
-
-DROP TABLE IF EXISTS images;
