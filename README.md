@@ -18,96 +18,28 @@ Modern web-based annotation tool with a clean UI, keyboard shortcuts, and collab
 
 ## 🚀 Quick Start
 
-### Installation
-
-**Option 1: Install from source**
-```bash
-go install github.com/lucasew/go-annotation@latest
-```
-
-**Option 2: Clone and build**
-```bash
-git clone https://github.com/lucasew/go-annotation.git
-cd go-annotation
-go build .
-```
-
 ### Initialize a Project
 
 ```bash
-# Create config and database with your images
-go-annotation init --images-dir ./my-images
+# Create config, database and empty image folder
+go-annotation folder
 
-# Or just create config and empty database
-go-annotation init
+# Ingest a folder of messy files to a images folder
+go-annotation ingest ./messy-folder ./images
+
 ```
-
-This creates:
-- `config.yaml` - Sample configuration file
-- `annotations.db` - SQLite database for annotations
 
 ### Start Annotating
 
 ```bash
-go-annotation annotator \
-  --config config.yaml \
-  --database annotations.db \
-  --images ./my-images
+go-annotation folder/config.yaml
 ```
 
 Then open http://localhost:8080 in your browser!
 
-## 📖 Usage Guide
-
-### Commands
-
-#### `init` - Initialize a new project
-```bash
-go-annotation init [flags]
-
-Flags:
-  -i, --images-dir string   Directory containing images to annotate
-  -c, --config string       Configuration file to create (default "config.yaml")
-  -d, --database string     Database file to create (default "annotations.db")
-
-Examples:
-  go-annotation init --images-dir ./photos
-  go-annotation init --images-dir ./data/images --config project.yaml
-```
-
-#### `annotator` - Start the annotation web server
-```bash
-go-annotation annotator [flags]
-
-Flags:
-  -c, --config string      Config file for the annotation (required)
-  -d, --database string    Where to store the annotation database (required)
-  -i, --images string      Directory containing images (required)
-  -a, --addr string        Server address (default ":8080")
-
-Example:
-  go-annotation annotator -c config.yaml -d annotations.db -i ./images
-```
-
-#### `ingest` - Import images from nested directories
-```bash
-go-annotation ingest <source-dir> <destination-dir>
-
-Example:
-  go-annotation ingest ./messy-photos ./clean-images
-```
-
-Converts nested directory structures into a flat folder of PNG files.
-
-#### `query` - Query the annotation database
-```bash
-go-annotation query -d annotations.db -t task_id
-
-Example:
-  go-annotation query -d annotations.db -t quality
-```
-
 ## ⚙️ Configuration
+
+There is a ready example in ./examples/test for you to play!
 
 ### Sample config.yaml
 
@@ -197,16 +129,10 @@ auth:
 
 ⚠️ **Security Note**: Passwords are stored in plaintext in the config. Use strong passwords and keep your config file secure.
 
-## ⌨️ Keyboard Shortcuts
-
-- `1-9` - Select classification option 1-9
-- `?` - Mark as "Not Sure"
-- Mouse click works too!
-
-## 🏗️ Architecture
+## Architecture
 
 ### Stack
-- **Backend**: Go with HTMX for dynamic interactions
+- **Backend**: Go templates with HTMX for SPA-like interactions
 - **Frontend**: DaisyUI + TailwindCSS with @tailwindcss/typography
 - **Templates**: Mold for layout inheritance
 - **Database**: SQLite (modernc.org/sqlite - pure Go, no CGO)
@@ -227,126 +153,12 @@ go-annotation/
 └── examples/          # Sample projects
 ```
 
-## 🎨 Development
+## Development
 
 ### Prerequisites
-- Go 1.24+
-- Node.js 22+ (for TailwindCSS)
-- Mise or npm
+- Mise
 
-### Build CSS
-```bash
-npm install
-npm run build:css
-```
-
-### Run Tests
-```bash
-go test ./...
-```
-
-### Build
-```bash
-go build .
-```
-
-## 📝 Examples
-
-Check the `examples/` directory for sample projects:
-```bash
-cd examples/simple-classifier
-go-annotation init --images-dir ./images
-go-annotation annotator -c config.yaml -d annotations.db -i ./images
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-See LICENSE file for details.
-
-## 🔧 Troubleshooting
-
-**Images not showing up?**
-- Ensure images are in a flat directory structure
-- Use `ingest` command to flatten nested directories
-- Check that images are valid PNG/JPG files
-
-**Can't log in?**
-- Check `auth` section in config.yaml
-- Verify username and password match
-
-**Database errors?**
-- Delete annotations.db and run `init` again
-- Check file permissions
-
-## 🚀 Deployment
-
-### Docker
-```dockerfile
-FROM golang:1.24 AS builder
-WORKDIR /app
-COPY . .
-RUN npm install && npm run build:css
-RUN CGO_ENABLED=0 go build -o go-annotation
-
-FROM alpine:latest
-COPY --from=builder /app/go-annotation /usr/local/bin/
-ENTRYPOINT ["go-annotation"]
-```
-
-### Systemd Service
-```ini
-[Unit]
-Description=go-annotation server
-After=network.target
-
-[Service]
-Type=simple
-User=annotator
-WorkingDirectory=/opt/go-annotation
-ExecStart=/usr/local/bin/go-annotation annotator -c config.yaml -d annotations.db -i /data/images
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## 📊 Exporting Data
-
-Query your annotations:
-```bash
-# Get all annotations for a task
-go-annotation query -d annotations.db -t quality
-
-# Export to CSV (use sqlite3)
-sqlite3 annotations.db "SELECT * FROM task_quality" -csv > quality.csv
-```
-
-## 🌟 Features in Detail
-
-### Conditional Workflows
-Create multi-stage annotation pipelines:
-```yaml
-tasks:
-  - id: has_face
-    type: boolean
-  - id: face_emotion
-    if: { has_face: "true" }
-    classes: { happy: {}, sad: {}, neutral: {} }
-```
-
-### Example Images in Help
-Add example images to help annotators:
-```yaml
-classes:
-  cat:
-    name: "Cat"
-    examples:
-      - "abc123hash"  # Image hash from your dataset
-```
+See mise.toml for details on commands
 
 ### Progress Tracking
 The system automatically tracks:
@@ -357,4 +169,6 @@ The system automatically tracks:
 
 ---
 
-**Made with ❤️ using Go, HTMX, and DaisyUI**
+**Made with ❤️ using Go, HTMX, DaisyUI and Claude Code**
+
+> The problem is not using AI, it's not setting up the project to be testable and reviewing its outputs
