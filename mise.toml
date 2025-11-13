@@ -1,5 +1,4 @@
 [tools]
-"github:amacneil/dbmate" = "2.28.0"
 "github:sqlc-dev/sqlc" = "1.30.0"
 go = "1.25.4"
 node = "22"
@@ -43,16 +42,3 @@ run = """
 rm -f go-annotation coverage.out coverage.html
 echo "✓ Cleaned"
 """
-
-[tasks."migrate-up"]
-description = "Run database migrations"
-run = "dbmate up"
-
-[tasks."migrate-down"]
-description = "Rollback last migration"
-run = "dbmate down"
-
-[tasks."migrate-status"]
-description = "Show migration status"
-run = "dbmate status"
-
