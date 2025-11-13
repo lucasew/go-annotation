@@ -80,17 +80,10 @@ func LoadConfig(filename string) (*Config, error) {
 	if len(ret.Authentication) == 0 {
 		return nil, fmt.Errorf("no users specified")
 	}
+	// Note: I18N configuration in YAML is deprecated.
+	// Use annotation/locales/*.json files for translations instead.
 	if len(ret.I18N) > 0 {
-		for _, term := range ret.I18N {
-			if term.Name == "" {
-				return nil, fmt.Errorf("one i18n item is invalid: does not provide the name attribute")
-			}
-			if term.Value == "" {
-				return nil, fmt.Errorf("one i18n item is invalid: does not provide the value attribute")
-			}
-
-			_i18n[term.Name] = term.Value
-		}
+		log.Printf("Warning: i18n configuration in YAML is deprecated. Use annotation/locales/*.json files instead.")
 	}
 	for user := range ret.Authentication {
 		if ret.Authentication[user].Password == "" {
