@@ -962,7 +962,7 @@ func (a *AnnotatorApp) PrepareDatabaseMigrations(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	migrationsFS, err := iofs.New(migrations.Migrations, "")
+	migrationsFS, err := iofs.New(migrations.Migrations, ".")
 	if err != nil {
 		return err
 	}
