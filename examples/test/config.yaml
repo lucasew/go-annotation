@@ -55,8 +55,8 @@ i18n:
     value: Anotar
   - name: Toggle theme
     value: Alternar tema
-  - name: Rotulador - Image Annotation Tool
-    value: Rotulador - Ferramenta de Anotação de Imagens
+  - name: Image Annotation Tool
+    value: Ferramenta de Anotação de Imagens
 
   # Progress Bar
   - name: completed
