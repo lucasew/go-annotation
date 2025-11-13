@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	// "github.com/davecgh/go-spew/spew"
-	"github.com/lucasew/go-annotation/annotation"
+	"github.com/lewtec/rotulador/annotation"
 	"github.com/spf13/cobra"
 )
 
@@ -50,16 +50,16 @@ var queryCmd = &cobra.Command{
 
 Examples:
   # List all distinct stage indexes (phases)
-  go-annotation query annotations.db
+  rotulador query annotations.db
 
   # List all distinct option values for stage 0
-  go-annotation query annotations.db 0
+  rotulador query annotations.db 0
 
   # List images annotated with value "landscape" for stage 0
-  go-annotation query annotations.db 0 landscape
+  rotulador query annotations.db 0 landscape
 
   # Query specific image
-  go-annotation query annotations.db 0 landscape image.jpg`,
+  rotulador query annotations.db 0 landscape image.jpg`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		showIDs, err := cmd.Flags().GetBool("show-ids")
 		if err != nil {

@@ -30,7 +30,7 @@ The new schema uses:
 - images table with id, path, and completion tracking
 - Unified annotations table with stage_index
 
-Example: go-annotation migrate-legacy-db old.db new.db config.yaml`,
+Example: rotulador migrate-legacy-db old.db new.db config.yaml`,
 	Args: cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		oldDBPath := args[0]
@@ -139,7 +139,7 @@ func migrateLegacyDatabase(ctx context.Context, oldDBPath, newDBPath, configPath
 	}
 
 	log.Printf("✓ Migration completed successfully!")
-	log.Printf("You can now use the new database with: go-annotation %s", newDBPath)
+	log.Printf("You can now use the new database with: rotulador %s", newDBPath)
 	return nil
 }
 

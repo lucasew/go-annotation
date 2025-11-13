@@ -20,9 +20,9 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/lucasew/go-annotation/db/migrations"
-	"github.com/lucasew/go-annotation/internal/domain"
-	"github.com/lucasew/go-annotation/internal/repository"
+	"github.com/lewtec/rotulador/db/migrations"
+	"github.com/lewtec/rotulador/internal/domain"
+	"github.com/lewtec/rotulador/internal/repository"
 )
 
 type AnnotatorApp struct {
@@ -627,8 +627,8 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		}
 
 		data := map[string]interface{}{
-			"Title":       i("Welcome to go-annotator"),
-			"ProjectName": i("Welcome to go-annotator"),
+			"Title":       i("Welcome to Rotulador"),
+			"ProjectName": i("Welcome to Rotulador"),
 			"Description": a.Config.Meta.Description,
 		}
 
@@ -637,6 +637,13 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			log.Printf("error rendering home template: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
+	})
+
+	// Favicon handler
+	mux.HandleFunc("/favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Cache-Control", "public, max-age=31536000")
+		w.Write([]byte(GetFavicon()))
 	})
 
 	// Help pages

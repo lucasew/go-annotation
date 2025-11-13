@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/lucasew/go-annotation/annotation"
+	"github.com/lewtec/rotulador/annotation"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +19,8 @@ var initCmd = &cobra.Command{
 - Optionally, scan an images directory
 
 Example:
-  go-annotation init --images-dir ./images
-  go-annotation init --images-dir ./images --config custom-config.yaml`,
+  rotulador init --images-dir ./images
+  rotulador init --images-dir ./images --config custom-config.yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		imagesDir, _ := cmd.Flags().GetString("images-dir")
 		configFile, _ := cmd.Flags().GetString("config")
@@ -75,7 +75,7 @@ Example:
 			fmt.Printf("✓ Database initialized with images from %s\n\n", absPath)
 		} else {
 			fmt.Printf("✓ Empty database created\n")
-			fmt.Printf("  Run 'go-annotation init --images-dir <path>' to populate with images\n\n")
+			fmt.Printf("  Run 'rotulador init --images-dir <path>' to populate with images\n\n")
 		}
 
 		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -84,7 +84,7 @@ Example:
 		fmt.Println("\nNext steps:")
 		fmt.Println("  1. Review and customize your config file:", configFile)
 		fmt.Println("  2. Start the annotation server:")
-		fmt.Printf("     go-annotation annotator -c %s -d %s -i %s\n", configFile, databaseFile, imagesDir)
+		fmt.Printf("     rotulador annotator -c %s -d %s -i %s\n", configFile, databaseFile, imagesDir)
 		fmt.Println("\nThen open http://localhost:8080 in your browser")
 
 		return nil
@@ -100,7 +100,7 @@ func init() {
 }
 
 func createSampleConfig(filename, imagesDir string) error {
-	sampleConfig := `# go-annotation configuration file
+	sampleConfig := `# rotulador configuration file
 # This file defines your annotation project
 
 meta:
