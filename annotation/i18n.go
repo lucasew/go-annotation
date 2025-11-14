@@ -32,17 +32,20 @@ func init() {
 	for _, locale := range locales {
 		data, err := localesFS.ReadFile("locales/" + locale + ".json")
 		if err != nil {
-			log.Printf("Warning: failed to read locale file %s: %v", locale, err)
+			log.Printf("i18n: WARNING - failed to read locale file %s: %v", locale, err)
 			continue
 		}
 
-		_, err = bundle.ParseMessageFileBytes(data, locale+".json")
+		msgFile, err := bundle.ParseMessageFileBytes(data, locale+".json")
 		if err != nil {
-			log.Printf("Warning: failed to parse locale file %s: %v", locale, err)
+			log.Printf("i18n: WARNING - failed to parse locale file %s: %v", locale, err)
+			continue
 		}
+		log.Printf("i18n: Loaded %d messages for locale %s", len(msgFile.Messages), locale)
 	}
 
 	defaultLocal = i18n.NewLocalizer(bundle, currentLocale)
+	log.Printf("i18n: Initialized with default locale: %s", currentLocale)
 }
 
 // SetLanguage sets the current language for translations
@@ -80,6 +83,8 @@ func WithLocalizer(ctx context.Context, localizer *i18n.Localizer) context.Conte
 func GetLocalizerFromRequest(r *http.Request) *i18n.Localizer {
 	acceptLang := r.Header.Get("Accept-Language")
 
+	log.Printf("i18n: Accept-Language header: %q", acceptLang)
+
 	// Parse Accept-Language header to get preferred languages
 	// Format: "en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7"
 	var langs []string
@@ -99,6 +104,7 @@ func GetLocalizerFromRequest(r *http.Request) *i18n.Localizer {
 		langs = []string{currentLocale}
 	}
 
+	log.Printf("i18n: Using language preferences: %v", langs)
 	return i18n.NewLocalizer(bundle, langs...)
 }
 
