@@ -38,7 +38,7 @@
   {{range $idx, $class := .Classes}}
   <button class="btn btn-primary btn-lg flex-1 min-w-[150px]" hx-post="/annotate/{{$.TaskID}}/{{$.ImageID}}"
     hx-vals='{"selectedClass": "{{$class.ID}}", "sure": "on"}' data-key="{{$class.Key}}">
-    {{$class.Name}}
+    {{i $class.Name}}
     {{if $class.Key}}<kbd class="kbd kbd-sm ml-2">{{$class.Key}}</kbd>{{end}}
   </button>
   {{end}}

@@ -126,5 +126,73 @@
   {
     "id": "annotation",
     "translation": "anotação"
+  },
+  {
+    "id": "Yes",
+    "translation": "Sim"
+  },
+  {
+    "id": "No",
+    "translation": "Não"
+  },
+  {
+    "id": "OK",
+    "translation": "OK"
+  },
+  {
+    "id": "Not rotated",
+    "translation": "Não rotacionada"
+  },
+  {
+    "id": "Invert X",
+    "translation": "Inverter X"
+  },
+  {
+    "id": "Invert in horizontal axis",
+    "translation": "Inverter no eixo horizontal"
+  },
+  {
+    "id": "Invert Y",
+    "translation": "Inverter Y"
+  },
+  {
+    "id": "Invert in vertical axis",
+    "translation": "Inverter no eixo vertical"
+  },
+  {
+    "id": "+90deg",
+    "translation": "+90°"
+  },
+  {
+    "id": "Rotate 90 degrees horary",
+    "translation": "Girar 90 graus horário"
+  },
+  {
+    "id": "-90deg",
+    "translation": "-90°"
+  },
+  {
+    "id": "Rotate 90 degrees antihorary",
+    "translation": "Girar 90 graus anti-horário"
+  },
+  {
+    "id": "180deg",
+    "translation": "180°"
+  },
+  {
+    "id": "Rotate 180 degrees",
+    "translation": "Girar 180 graus"
+  },
+  {
+    "id": "Congratulations!",
+    "translation": "Parabéns!"
+  },
+  {
+    "id": "All annotations are complete!",
+    "translation": "Todas as anotações foram concluídas!"
+  },
+  {
+    "id": "Go to Home",
+    "translation": "Ir para o Início"
   }
 ]
