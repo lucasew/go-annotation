@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/russross/blackfriday/v2"
 )
 
@@ -28,7 +27,7 @@ var (
 	TemplateFuncMap = template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
-		"i": i, // Internationalization function (uses goroutine-local localizer)
+		"i":   i, // Internationalization function (uses goroutine-local localizer)
 		"markdown": func(text string) template.HTML {
 			// Convert markdown to HTML using blackfriday v2
 			return template.HTML(blackfriday.Run([]byte(text)))
