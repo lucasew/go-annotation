@@ -28,7 +28,7 @@ var (
 	TemplateFuncMap = template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
-		"i": i, // Internationalization function (uses default localizer, override via data for context-aware)
+		"i": i, // Internationalization function (uses goroutine-local localizer)
 		"markdown": func(text string) template.HTML {
 			// Convert markdown to HTML using blackfriday v2
 			return template.HTML(blackfriday.Run([]byte(text)))
@@ -54,17 +54,11 @@ func RenderPageWithContext(ctx context.Context, w io.Writer, pageName string, da
 	}
 	data["CSS"] = template.CSS(cssContent)
 
-	// Inject context-aware translation function
+	// Set goroutine-local localizer for the i18n function in templates
 	localizer := GetLocalizerFromContext(ctx)
-	data["i"] = func(messageID string) string {
-		msg, err := localizer.Localize(&i18n.LocalizeConfig{
-			MessageID: messageID,
-		})
-		if err != nil {
-			return messageID
-		}
-		return msg
-	}
+	gid := getGoroutineID()
+	goroutineLocalizers.Store(gid, localizer)
+	defer goroutineLocalizers.Delete(gid) // Clean up after rendering
 
 	return templateManager.Render(w, "pages/"+pageName, data)
 }
