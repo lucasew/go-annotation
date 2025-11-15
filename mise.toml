@@ -15,6 +15,17 @@ run = "npm run build:css"
 description = "Generate Go code from SQL queries using sqlc"
 run = "sqlc generate"
 
+[tasks."gen:i18n"]
+description = "Extract and merge i18n strings"
+run = """
+echo "→ Extracting translatable strings..."
+goi18n extract -format json -outdir .
+echo "→ Merging with existing translations..."
+goi18n merge -format json -outdir annotation/locales active.en.json annotation/locales/*.json
+rm -f active.en.json
+echo "✓ i18n files updated. Check annotation/locales/translate.*.json for new strings to translate."
+"""
+
 [tasks.ci]
 description = "Run CI checks (gen + build)"
 depends = ["gen"]

@@ -3,6 +3,7 @@ package annotation
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -80,6 +81,7 @@ func LoadConfig(filename string) (*Config, error) {
 	if len(ret.Authentication) == 0 {
 		return nil, fmt.Errorf("no users specified")
 	}
+	// Load i18n strings from YAML config into default locale
 	if len(ret.I18N) > 0 {
 		for _, term := range ret.I18N {
 			if term.Name == "" {
@@ -88,9 +90,12 @@ func LoadConfig(filename string) (*Config, error) {
 			if term.Value == "" {
 				return nil, fmt.Errorf("one i18n item is invalid: does not provide the value attribute")
 			}
-
-			_i18n[term.Name] = term.Value
+			// Add to bundle as English messages
+			if err := AddMessage("en", term.Name, term.Value); err != nil {
+				log.Printf("Warning: failed to add i18n message %s: %v", term.Name, err)
+			}
 		}
+		log.Printf("Loaded %d i18n strings from YAML config", len(ret.I18N))
 	}
 	for user := range ret.Authentication {
 		if ret.Authentication[user].Password == "" {

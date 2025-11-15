@@ -1,10 +1,11 @@
 package annotation
 
 import (
+	"context"
 	"embed"
 	"html/template"
 	"io"
-	"maps"
+	"net/http"
 
 	"github.com/russross/blackfriday/v2"
 )
@@ -26,7 +27,7 @@ var (
 	TemplateFuncMap = template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
-		"i": i, // Internationalization function
+		"i":   i, // Internationalization function (uses goroutine-local localizer)
 		"markdown": func(text string) template.HTML {
 			// Convert markdown to HTML using blackfriday v2
 			return template.HTML(blackfriday.Run([]byte(text)))
@@ -44,32 +45,27 @@ func init() {
 	}
 }
 
-// RenderPage renders a page using mold with automatic CSS injection
-func RenderPage(w io.Writer, pageName string, data map[string]any) error {
+// RenderPageWithContext renders a page with context-aware i18n
+func RenderPageWithContext(ctx context.Context, w io.Writer, pageName string, data map[string]any) error {
 	// Inject CSS automatically
 	if data == nil {
 		data = make(map[string]any)
 	}
 	data["CSS"] = template.CSS(cssContent)
 
+	// Set goroutine-local localizer for the i18n function in templates
+	localizer := GetLocalizerFromContext(ctx)
+	gid := getGoroutineID()
+	goroutineLocalizers.Store(gid, localizer)
+	defer goroutineLocalizers.Delete(gid) // Clean up after rendering
+
 	return templateManager.Render(w, "pages/"+pageName, data)
 }
 
-// RenderPageWithTitle is a convenience function to render a page with just a title
-func RenderPageWithTitle(w io.Writer, pageName, title string, data any) error {
-	dataMap := make(map[string]any)
-
-	// Set title
-	dataMap["Title"] = title
-
-	// If data is already a map, merge it
-	if m, ok := data.(map[string]any); ok {
-		maps.Copy(dataMap, m)
-	} else if data != nil {
-		dataMap["Data"] = data
-	}
-
-	return RenderPage(w, pageName, dataMap)
+// RenderPageWithRequest renders a page with request-aware i18n
+// ALWAYS use this function for rendering pages to ensure proper i18n support
+func RenderPageWithRequest(r *http.Request, w io.Writer, pageName string, data map[string]any) error {
+	return RenderPageWithContext(r.Context(), w, pageName, data)
 }
 
 // GetFavicon returns the embedded favicon content

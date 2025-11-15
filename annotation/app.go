@@ -627,12 +627,12 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		}
 
 		data := map[string]interface{}{
-			"Title":       i("Welcome to Rotulador"),
-			"ProjectName": i("Welcome to Rotulador"),
+			"Title":       "Welcome to Rotulador",
+			"ProjectName": "Welcome to Rotulador",
 			"Description": a.Config.Meta.Description,
 		}
 
-		err := RenderPage(w, "home.html", data)
+		err := RenderPageWithRequest(r, w, "home.html", data)
 		if err != nil {
 			log.Printf("error rendering home template: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -735,7 +735,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			"Tasks":       tasks,
 		}
 
-		err := RenderPage(w, "help.html", data)
+		err := RenderPageWithRequest(r, w, "help.html", data)
 		if err != nil {
 			log.Printf("error rendering help template: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -756,9 +756,9 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			}
 			if step == nil {
 				data := map[string]interface{}{
-					"Title": i("All annotations are done!"),
+					"Title": "All annotations are done!",
 				}
-				err := RenderPage(w, "complete.html", data)
+				err := RenderPageWithRequest(r, w, "complete.html", data)
 				if err != nil {
 					log.Printf("error rendering complete template: %s", err)
 				}
@@ -858,7 +858,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 		}
 
 		data := map[string]interface{}{
-			"Title":         i("annotation"),
+			"Title":         "annotation",
 			"TaskID":        taskID,
 			"TaskName":      task.Name,
 			"ImageID":       imageID,
@@ -873,7 +873,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 			},
 		}
 
-		err = RenderPage(w, "annotate.html", data)
+		err = RenderPageWithRequest(r, w, "annotate.html", data)
 		if err != nil {
 			log.Printf("error rendering annotate template: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -917,6 +917,7 @@ func (a *AnnotatorApp) GetHTTPHandler() http.Handler {
 	log.Printf("images dir: %s", a.ImagesDir)
 
 	var handler http.Handler = mux
+	handler = i18nMiddleware(handler)
 	handler = HTTPLogger(handler)
 	handler = a.authenticationMiddleware(handler)
 	handler = requestCacheMiddleware(handler)
