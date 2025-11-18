@@ -6,18 +6,17 @@ require (
 	github.com/abiosoft/mold v0.0.0-20250328135240-0a4c28cb836a
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/uuid v1.6.0
-	github.com/russross/blackfriday/v2 v2.1.0
+	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/spf13/cobra v1.10.1
+	golang.org/x/text v0.31.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.40.0
+	modernc.org/sqlite v1.40.1
 )
 
 require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/nicksnyder/go-i18n/v2 v2.6.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
 )
 
 require (
